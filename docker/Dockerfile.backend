@@ -1,0 +1,30 @@
+# T074 — Backend (Express + TS) 멀티스테이지 빌드
+# 결과 이미지: 슬림 node:20, dist/ 만 포함, 포트 9532
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY backend/package.json backend/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY backend ./
+RUN npm run build
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    PORT=9532 \
+    PUBLIC_DOMAIN=p12.sumzip.com
+# 프로덕션 의존성만 재설치
+COPY backend/package.json backend/package-lock.json* ./
+RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY --from=build /app/dist ./dist
+# 마이그레이션/시드 파일 동봉 (db:migrate 가 ../../db 를 참조)
+COPY db ../db
+EXPOSE 9532
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD wget -qO- http://127.0.0.1:9532/api/healthz || exit 1
+USER node
+CMD ["node", "dist/index.js"]

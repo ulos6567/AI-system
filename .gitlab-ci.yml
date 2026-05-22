@@ -1,0 +1,121 @@
+stages:
+  - secret-scan
+  - lint
+  - test
+  - build
+  - docker
+  - deploy
+
+variables:
+  NODE_VERSION: "20"
+  REGISTRY: ${CI_REGISTRY_IMAGE}
+
+.node_template: &node_setup
+  image: node:20-alpine
+  before_script:
+    - apk add --no-cache bash git
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - frontend/node_modules/
+      - backend/node_modules/
+
+secrets:check:
+  stage: secret-scan
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache bash git grep
+  script:
+    - bash scripts/check-secrets.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+lint:frontend:
+  <<: *node_setup
+  stage: lint
+  script:
+    - cd frontend && npm ci && npm run lint
+
+lint:backend:
+  <<: *node_setup
+  stage: lint
+  script:
+    - cd backend && npm ci && npm run lint
+
+test:backend:
+  <<: *node_setup
+  stage: test
+  script:
+    - cd backend && npm ci && npm test
+  artifacts:
+    when: always
+    reports:
+      junit: backend/junit.xml
+    paths: [backend/coverage/]
+
+test:frontend:
+  <<: *node_setup
+  stage: test
+  script:
+    - cd frontend && npm ci && npm test
+  artifacts:
+    when: always
+    paths: [frontend/coverage/]
+
+build:frontend:
+  <<: *node_setup
+  stage: build
+  script:
+    - cd frontend && npm ci && npm run build
+  artifacts:
+    paths: [frontend/dist/]
+    expire_in: 1 week
+
+build:backend:
+  <<: *node_setup
+  stage: build
+  script:
+    - cd backend && npm ci && npm run build
+  artifacts:
+    paths: [backend/dist/]
+    expire_in: 1 week
+
+docker:build-push:
+  stage: docker
+  image: docker:24
+  services: [docker:24-dind]
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - docker build -f docker/Dockerfile.backend  -t "$REGISTRY/backend:$CI_COMMIT_SHORT_SHA"  -t "$REGISTRY/backend:latest" .
+    - docker build -f docker/Dockerfile.frontend -t "$REGISTRY/frontend:$CI_COMMIT_SHORT_SHA" -t "$REGISTRY/frontend:latest" .
+    - docker push "$REGISTRY/backend:$CI_COMMIT_SHORT_SHA"
+    - docker push "$REGISTRY/backend:latest"
+    - docker push "$REGISTRY/frontend:$CI_COMMIT_SHORT_SHA"
+    - docker push "$REGISTRY/frontend:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+deploy:staging:
+  stage: deploy
+  image: alpine:3.20
+  script:
+    - echo "TODO: ssh + docker compose pull && up -d (staging)"
+  environment:
+    name: staging
+    url: https://p12.sumzip.com
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+deploy:prod:
+  stage: deploy
+  image: alpine:3.20
+  script:
+    - echo "TODO: prod rollout"
+  environment:
+    name: production
+    url: https://p12.sumzip.com
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

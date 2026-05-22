@@ -1,0 +1,37 @@
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+coverage/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+.vscode/
+.idea/
+
+# Docker volumes
+docker/volumes/
+mariadb-data/
+
+# Logs
+logs/
+*.log
+
+# Offline buffer (T045)
+.local-buffer.jsonl
+backend/.local-buffer.jsonl

@@ -1,0 +1,62 @@
+{
+  "app": {
+    "title": "AI 점포 운영 시스템",
+    "logout": "로그아웃"
+  },
+  "nav": {
+    "orders": "발주",
+    "inventory": "재고",
+    "transactions": "거래/매출",
+    "pricingRules": "가격 룰",
+    "pricingEvents": "가격 이력",
+    "reports": "리포트",
+    "selfCheckout": "셀프 결제",
+    "mappings": "매핑 검토"
+  },
+  "auth": {
+    "loginTitle": "로그인",
+    "email": "이메일",
+    "password": "비밀번호",
+    "loggingIn": "로그인 중…",
+    "loginFailed": "로그인 실패",
+    "demoHint": "데모"
+  },
+  "orders": {
+    "title": "발주 대시보드",
+    "forecasts": "다음 영업일 예측",
+    "regenerate": "새로고침",
+    "generateAuto": "자동 발주 생성",
+    "generating": "생성 중…",
+    "recent": "최근 발주",
+    "status": {
+      "approved": "승인됨",
+      "sent": "송신완료",
+      "pending_review": "검토 필요",
+      "received": "입고완료",
+      "cancelled": "취소됨",
+      "failed": "실패",
+      "draft": "초안"
+    },
+    "approveSend": "승인·송신",
+    "cancel": "취소"
+  },
+  "inventory": {
+    "title": "재고 관리",
+    "summary": { "total": "전체", "nearExpiry": "유통기한 임박", "lowStock": "저재고", "zero": "결품" },
+    "filters": { "nearExpiry": "유통기한 임박만", "thresholdDays": "임계(일)", "category": "카테고리" }
+  },
+  "transactions": {
+    "title": "거래·매출",
+    "metrics": { "revenue": "총 매출", "count": "거래 건수", "avgTicket": "평균 객단가" },
+    "aggregate": { "daily": "일별", "weekly": "주별", "monthly": "월별" }
+  },
+  "common": {
+    "loading": "불러오는 중…",
+    "empty": "데이터 없음",
+    "refresh": "새로고침",
+    "save": "저장",
+    "delete": "삭제",
+    "edit": "수정",
+    "close": "닫기"
+  }
+}

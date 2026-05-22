@@ -1,0 +1,565 @@
+openapi: 3.0.3
+info:
+  title: AI Store Operations API
+  description: |
+    AI 기반 점포 운영 시스템 REST API.
+    Spec: ../spec.md  Plan: ../plan.md  DataModel: ../data-model.md
+  version: 0.1.0
+servers:
+  - url: /api
+    description: 동일 도메인(Nginx 리버스 프록시 뒤)
+
+tags:
+  - name: auth
+  - name: stores
+  - name: products
+  - name: inventory
+  - name: transactions
+  - name: orders
+  - name: pricing
+  - name: events
+  - name: external-signals
+  - name: reports
+
+security:
+  - sessionCookie: []
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: sid
+    bearerJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+    Pagination:
+      type: object
+      properties:
+        page: { type: integer, minimum: 1 }
+        size: { type: integer, minimum: 1, maximum: 200 }
+        total: { type: integer }
+    Store:
+      type: object
+      required: [id, code, name, status]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        address: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        timezone: { type: string }
+        status: { type: string, enum: [active, suspended, closed] }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+    CurrentUser:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        displayName: { type: string }
+        globalRole: { type: string }
+        scopedStores:
+          type: array
+          items:
+            type: object
+            properties:
+              storeId: { type: integer }
+              storeRole: { type: string }
+    Product:
+      type: object
+      properties:
+        id: { type: integer }
+        masterCode: { type: string }
+        name: { type: string }
+        category: { type: string }
+        barcode: { type: string }
+        shelfLifeDays: { type: integer }
+        tempZone: { type: string, enum: [ambient, chilled, frozen] }
+    ProductLocalMapping:
+      type: object
+      properties:
+        id: { type: integer }
+        storeId: { type: integer }
+        localCode: { type: string }
+        localName: { type: string }
+        productMasterId: { type: integer, nullable: true }
+        confidence: { type: number }
+        status: { type: string, enum: [auto, confirmed, rejected, pending] }
+    InventoryItem:
+      type: object
+      properties:
+        productMasterId: { type: integer }
+        productName: { type: string }
+        quantity: { type: integer }
+        shelfLocation: { type: string }
+        expiresAt: { type: string, format: date, nullable: true }
+        nearExpiry: { type: boolean }
+    Transaction:
+      type: object
+      properties:
+        id: { type: integer }
+        storeId: { type: integer }
+        posSource: { type: string, enum: [pos, self_kiosk, app] }
+        occurredAt: { type: string, format: date-time }
+        totalAmount: { type: number }
+        paymentMethod: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              productMasterId: { type: integer }
+              quantity: { type: integer }
+              unitPrice: { type: number }
+              discountApplied: { type: number }
+    PurchaseOrder:
+      type: object
+      properties:
+        id: { type: integer }
+        storeId: { type: integer }
+        orderDate: { type: string, format: date }
+        status:
+          type: string
+          enum: [draft, pending_review, approved, sent, received, cancelled, failed]
+        source: { type: string, enum: [auto, manual] }
+        autoHoldReason: { type: string, nullable: true }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              productMasterId: { type: integer }
+              orderedQuantity: { type: integer }
+              receivedQuantity: { type: integer, nullable: true }
+    PricingRule:
+      type: object
+      properties:
+        id: { type: integer }
+        storeId: { type: integer, nullable: true }
+        name: { type: string }
+        triggerType: { type: string, enum: [shelf_life, weather, demand_drop, manual, schedule] }
+        triggerConfig: { type: object }
+        actionType: { type: string, enum: [percent_off, fixed_price, bundle] }
+        actionConfig: { type: object }
+        isActive: { type: boolean }
+    PricingEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        storeId: { type: integer }
+        productMasterId: { type: integer }
+        pricingRuleId: { type: integer }
+        originalPrice: { type: number }
+        adjustedPrice: { type: number }
+        effectiveFrom: { type: string, format: date-time }
+        effectiveTo: { type: string, format: date-time }
+        eslPushStatus: { type: string, enum: [pending, sent, failed] }
+    Event:
+      type: object
+      properties:
+        id: { type: integer }
+        storeId: { type: integer, nullable: true }
+        severity: { type: string, enum: [info, warn, error, critical] }
+        eventType: { type: string }
+        message: { type: string }
+        metadata: { type: object }
+        occurredAt: { type: string, format: date-time }
+    KpiDaily:
+      type: object
+      properties:
+        storeId: { type: integer }
+        metricDate: { type: string, format: date }
+        revenue: { type: number }
+        transactionsCount: { type: integer }
+        avgTicket: { type: number }
+        discardAmount: { type: number }
+        discardRate: { type: number }
+        forecastMape: { type: number, nullable: true }
+
+  responses:
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: 권한 없음
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: 리소스 없음
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+paths:
+
+  # ── 인증 ─────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [auth]
+      security: []
+      summary: 로그인
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK (Set-Cookie: sid)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: 로그아웃
+      responses: { '204': { description: OK } }
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: 현재 사용자
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+
+  # ── 점포 ─────────────────────────────────────
+  /stores:
+    get:
+      tags: [stores]
+      summary: 권한 범위 내 점포 목록
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Store' }
+  /stores/{storeId}:
+    get:
+      tags: [stores]
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Store' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── 상품·매핑 ─────────────────────────────────
+  /products:
+    get:
+      tags: [products]
+      summary: 마스터 상품 검색
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, default: 50 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
+  /stores/{storeId}/product-mappings:
+    get:
+      tags: [products]
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProductLocalMapping' }
+    post:
+      tags: [products]
+      summary: 로컬 코드 일괄 업로드(CSV/JSON)
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses: { '202': { description: Accepted (배치 처리) } }
+  /stores/{storeId}/product-mappings/{mappingId}:
+    patch:
+      tags: [products]
+      summary: 매핑 확정/거절
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: mappingId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                productMasterId: { type: integer }
+                status: { type: string, enum: [confirmed, rejected] }
+      responses: { '200': { description: OK } }
+
+  # ── 재고 ────────────────────────────────────
+  /stores/{storeId}/inventory:
+    get:
+      tags: [inventory]
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: nearExpiry, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/InventoryItem' }
+
+  # ── 거래 ────────────────────────────────────
+  /stores/{storeId}/transactions:
+    get:
+      tags: [transactions]
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to,   in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Transaction' }
+  /stores/{storeId}/transactions/ingest:
+    post:
+      tags: [transactions]
+      summary: POS 어댑터용 일괄 적재(모의 또는 실연동)
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/Transaction' }
+      responses: { '202': { description: Accepted } }
+
+  # ── 발주·수요 예측 ───────────────────────────
+  /stores/{storeId}/forecasts:
+    get:
+      tags: [orders]
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: targetDate, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    productMasterId: { type: integer }
+                    predictedQuantity: { type: integer }
+                    confidence: { type: number }
+  /stores/{storeId}/orders:
+    get:
+      tags: [orders]
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PurchaseOrder' }
+    post:
+      tags: [orders]
+      summary: 수동 발주 생성
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOrder' }
+      responses: { '201': { description: Created } }
+  /stores/{storeId}/orders/auto-generate:
+    post:
+      tags: [orders]
+      summary: 자동 발주 트리거(스케줄러 외 수동 호출)
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      responses: { '202': { description: Accepted } }
+  /stores/{storeId}/orders/{orderId}:
+    get:
+      tags: [orders]
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: orderId, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrder' }
+    patch:
+      tags: [orders]
+      summary: 발주 확정·수정·취소
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: orderId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [approved, cancelled] }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      productMasterId: { type: integer }
+                      orderedQuantity: { type: integer }
+      responses: { '200': { description: OK } }
+
+  # ── 가격 전략 ────────────────────────────────
+  /pricing/rules:
+    get:
+      tags: [pricing]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PricingRule' }
+    post:
+      tags: [pricing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PricingRule' }
+      responses: { '201': { description: Created } }
+  /pricing/rules/{ruleId}:
+    patch:
+      tags: [pricing]
+      parameters: [{ name: ruleId, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PricingRule' }
+      responses: { '200': { description: OK } }
+  /stores/{storeId}/pricing-events:
+    get:
+      tags: [pricing]
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PricingEvent' }
+
+  # ── 이벤트·알림(SSE) ─────────────────────────
+  /stores/{storeId}/events:
+    get:
+      tags: [events]
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: severity, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Event' }
+  /stores/{storeId}/events/stream:
+    get:
+      tags: [events]
+      summary: 실시간 이벤트 스트림 (Server-Sent Events)
+      parameters: [{ name: storeId, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  # ── 외부 신호 ────────────────────────────────
+  /external-signals:
+    get:
+      tags: [external-signals]
+      parameters:
+        - { name: type, in: query, schema: { type: string, enum: [weather, foot_traffic, event, holiday, competitor] } }
+        - { name: storeId, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+
+  # ── 리포트 ──────────────────────────────────
+  /stores/{storeId}/reports/daily:
+    get:
+      tags: [reports]
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to,   in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/KpiDaily' }

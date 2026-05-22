@@ -1,0 +1,30 @@
+{
+  "root": true,
+  "ignorePatterns": ["dist/", "build/", "node_modules/", "coverage/"],
+  "overrides": [
+    {
+      "files": ["backend/**/*.ts"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" },
+      "plugins": ["@typescript-eslint"],
+      "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+      "env": { "node": true, "es2022": true, "jest": true },
+      "rules": {
+        "no-console": ["warn", { "allow": ["warn", "error"] }],
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
+      }
+    },
+    {
+      "files": ["frontend/**/*.ts", "frontend/**/*.vue"],
+      "parser": "vue-eslint-parser",
+      "parserOptions": {
+        "parser": "@typescript-eslint/parser",
+        "ecmaVersion": 2022,
+        "sourceType": "module"
+      },
+      "extends": ["eslint:recommended", "plugin:vue/vue3-recommended"],
+      "env": { "browser": true, "es2022": true }
+    }
+  ]
+}

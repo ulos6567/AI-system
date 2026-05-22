@@ -1,0 +1,20 @@
+# T074 — Frontend (Vue 3 + Vite) → Nginx 정적 호스팅 (포트 9512)
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend ./
+RUN npm run build
+
+FROM nginx:1.27-alpine AS runtime
+# strictPort 와 일치하도록 nginx 내부 포트도 9512 로 설정
+RUN sed -i 's/listen\s*80;/listen 9512;/' /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 9512
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD wget -qO- http://127.0.0.1:9512/ || exit 1

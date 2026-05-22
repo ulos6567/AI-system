@@ -1,0 +1,33 @@
+{
+  "app": {
+    "title": "AI Store Operations",
+    "logout": "Logout"
+  },
+  "nav": {
+    "orders": "Orders",
+    "inventory": "Inventory",
+    "transactions": "Transactions",
+    "pricingRules": "Pricing Rules",
+    "pricingEvents": "Pricing Events",
+    "reports": "Reports",
+    "selfCheckout": "Self Checkout",
+    "mappings": "Mappings"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "loggingIn": "Signing in…",
+    "loginFailed": "Login failed",
+    "demoHint": "Demo"
+  },
+  "common": {
+    "loading": "Loading…",
+    "empty": "No data",
+    "refresh": "Refresh",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close"
+  }
+}
