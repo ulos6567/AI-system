@@ -23,11 +23,23 @@ async function ensureMigrationTable(): Promise<void> {
 }
 
 function splitStatements(sql: string): string[] {
-  // 간단 분리기: DELIMITER 미지원. 일반 DDL/DML 만 가정.
-  return sql
-    .split(/;\s*(?:\n|$)/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith('--'));
+  // 라인 기반 분리: 주석/빈줄 무시, 끝이 ';' 인 라인을 statement 종료로 본다.
+  // DELIMITER 미지원. 문자열 리터럴 안의 ';' 는 고려하지 않음(스키마 SQL 가정).
+  const out: string[] = [];
+  let cur = '';
+  for (const raw of sql.split(/\r?\n/)) {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('--')) continue;
+    cur += raw + '\n';
+    if (trimmed.endsWith(';')) {
+      const stmt = cur.replace(/;\s*$/, '').trim();
+      if (stmt) out.push(stmt);
+      cur = '';
+    }
+  }
+  const tail = cur.trim();
+  if (tail) out.push(tail.replace(/;\s*$/, ''));
+  return out;
 }
 
 async function applyFile(filename: string): Promise<void> {

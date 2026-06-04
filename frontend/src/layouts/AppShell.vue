@@ -13,14 +13,14 @@ const events = useEventsStore();
 const navOpen = ref(false);
 
 const navItems = [
-  { name: 'orders',         label: '발주',        icon: '📦' },
-  { name: 'inventory',      label: '재고',        icon: '🗄️' },
-  { name: 'transactions',   label: '거래/매출',    icon: '💳' },
-  { name: 'pricing-rules',  label: '가격 룰',     icon: '💲' },
-  { name: 'pricing-events', label: '가격 이력',    icon: '📈' },
-  { name: 'reports',        label: '리포트',      icon: '📊' },
-  { name: 'self-checkout',  label: '셀프 결제',   icon: '🛒' },
-  { name: 'mappings',       label: '매핑 검토',   icon: '🔗' },
+  { name: 'orders',         label: '발주 관리',      icon: '📦' },
+  { name: 'inventory',      label: '재고 관리',      icon: '🗄️' },
+  { name: 'transactions',   label: '매출 현황',      icon: '💳' },
+  { name: 'pricing-rules',  label: '가격 정책',      icon: '💲' },
+  { name: 'pricing-events', label: '가격 변동 이력',  icon: '📈' },
+  { name: 'reports',        label: '경영 리포트',    icon: '📊' },
+  { name: 'self-checkout',  label: '셀프 계산대',    icon: '🛒' },
+  { name: 'mappings',       label: '상품 매핑',      icon: '🔗' },
 ];
 
 const currentStore = computed(() => {
@@ -67,9 +67,17 @@ onMounted(async () => {
           <span v-if="events.unreadCount > 0" class="badge">{{ events.unreadCount > 99 ? '99+' : events.unreadCount }}</span>
         </button>
         <span class="user">{{ auth.user?.displayName }}</span>
+        <span class="role" :class="{ admin: auth.isAdmin }" :title="auth.isAdmin ? '쓰기 권한 보유' : '읽기 전용 계정'">
+          {{ auth.isAdmin ? '🛡 ' + auth.roleLabel : '👁 ' + auth.roleLabel }}
+        </span>
         <button class="logout" @click="doLogout">로그아웃</button>
       </div>
     </header>
+
+    <div v-if="!auth.isAdmin && route.name !== 'self-checkout'" class="readonly-banner">
+      🔒 열람 전용 계정입니다. 발주 승인·가격 변경·매핑 수정 등 데이터 수정은 관리자(본사)만 가능합니다.
+      <span class="banner-sub">셀프 계산대 결제는 누구나 이용할 수 있어요.</span>
+    </div>
 
     <div class="body">
       <nav class="sidenav" :class="{ open: navOpen }" @click="navOpen = false">
@@ -141,7 +149,27 @@ onMounted(async () => {
   text-align: center;
   font-weight: 700;
 }
+.role {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #334155;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+.role.admin { background: #5645d4; color: #fff; }
 .logout { background: #38bdf8; color: #0f172a; border: none; border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; font-weight: 600; }
+.readonly-banner {
+  background: #fef7d6;
+  color: #793400;
+  border-bottom: 1px solid #f5d75e;
+  padding: 0.55rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+}
+.banner-sub { color: #1aae39; margin-left: 0.4rem; }
 .body { display: flex; flex: 1; min-height: 0; }
 .sidenav {
   width: 220px;

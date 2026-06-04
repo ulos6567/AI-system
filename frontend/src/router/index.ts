@@ -5,9 +5,13 @@ import { setUnauthorizedHandler } from '@/api/client';
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    // 공개 메인 페이지 — 비로그인 방문자도 열람 가능 (첫 화면)
+    { path: '/', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { public: true } },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
+    { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { public: true } },
     {
-      path: '/',
+      // 인증이 필요한 앱 영역 (/app/*)
+      path: '/app',
       component: () => import('@/layouts/AppShell.vue'),
       children: [
         { path: '', redirect: { name: 'orders' } },

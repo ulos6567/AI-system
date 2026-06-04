@@ -88,7 +88,7 @@ const statusBadge = (s: string): string => {
   <div class="orders-view">
     <header class="page-header">
       <div>
-        <h2>발주 대시보드</h2>
+        <h2>발주 관리</h2>
         <p class="subtitle">점포 #{{ storeId }} · 대상일 {{ targetDate }}</p>
       </div>
       <div class="cutoff" :class="{ urgent: cutoffSeconds < 3600 }">
@@ -105,7 +105,7 @@ const statusBadge = (s: string): string => {
             <input v-model="targetDate" type="date" @change="regenerateForecasts" />
           </label>
           <button class="ghost" :disabled="orders.loading" @click="regenerateForecasts">새로고침</button>
-          <button class="primary" :disabled="orders.loading || generating" @click="runAuto">
+          <button v-if="auth.isAdmin" class="primary" :disabled="orders.loading || generating" @click="runAuto">
             {{ generating ? '생성 중…' : '자동 발주 생성' }}
           </button>
         </div>
@@ -168,8 +168,9 @@ const statusBadge = (s: string): string => {
             <td class="num">{{ o.itemCount }}</td>
             <td class="muted">{{ o.autoHoldReason ?? '—' }}</td>
             <td class="row-actions">
-              <button v-if="o.status === 'pending_review'" class="primary sm" @click="approveOrder(o.id)">승인·송신</button>
-              <button v-if="['draft','pending_review','approved'].includes(o.status)" class="ghost sm" @click="cancelOrder(o.id)">취소</button>
+              <button v-if="auth.isAdmin && o.status === 'pending_review'" class="primary sm" @click="approveOrder(o.id)">승인·송신</button>
+              <button v-if="auth.isAdmin && ['draft','pending_review','approved'].includes(o.status)" class="ghost sm" @click="cancelOrder(o.id)">취소</button>
+              <span v-if="!auth.isAdmin" class="readonly-hint">열람 전용</span>
             </td>
           </tr>
         </tbody>
@@ -230,6 +231,7 @@ th, td { padding: 0.6rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f
 th { color: #475569; font-weight: 600; background: #f8fafc; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .muted { color: #94a3b8; }
+.readonly-hint { font-size: 0.72rem; color: #a4a097; font-style: italic; }
 .cat { background: #f1f5f9; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; color: #475569; }
 .confidence[data-level="high"] { color: #15803d; font-weight: 600; }
 .confidence[data-level="low"] { color: #b45309; font-weight: 600; }

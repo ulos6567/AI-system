@@ -8,17 +8,29 @@ const route = useRoute();
 const auth = useAuthStore();
 const email = ref('');
 const password = ref('');
+const passwordConfirm = ref('');
+const displayName = ref('');
+const localError = ref<string | null>(null);
 
 async function submit(): Promise<void> {
-  const ok = await auth.login(email.value, password.value);
+  localError.value = null;
+  if (password.value.length < 8) {
+    localError.value = '비밀번호는 8자 이상이어야 합니다.';
+    return;
+  }
+  if (password.value !== passwordConfirm.value) {
+    localError.value = '비밀번호가 일치하지 않습니다.';
+    return;
+  }
+  const ok = await auth.register(email.value, password.value, displayName.value);
   if (ok) {
     const redirect = route.query.redirect as string | undefined;
     router.push(redirect || { name: 'orders' });
   }
 }
 
-function goRegister(): void {
-  router.push({ name: 'register', query: route.query });
+function goLogin(): void {
+  router.push({ name: 'login', query: route.query });
 }
 
 function goHome(): void {
@@ -30,27 +42,38 @@ function goHome(): void {
   <div class="login-wrap">
     <form class="card" @submit.prevent="submit">
       <button type="button" class="home-link" @click="goHome">← 메인으로</button>
-      <h1>AI 점포 운영 시스템</h1>
-      <p class="hint">로그인하여 발주·재고·매출을 확인하세요.</p>
+      <h1>회원가입</h1>
+      <p class="hint">계정을 만들어 AI 점포 운영 시스템을 이용하세요.</p>
 
+      <label>
+        이름
+        <input v-model="displayName" type="text" autocomplete="off" required />
+      </label>
       <label>
         이메일
         <input v-model="email" type="email" autocomplete="off" required />
       </label>
       <label>
         비밀번호
-        <input v-model="password" type="password" autocomplete="off" required />
+        <input v-model="password" type="password" autocomplete="new-password" minlength="8" required />
+      </label>
+      <label>
+        비밀번호 확인
+        <input v-model="passwordConfirm" type="password" autocomplete="new-password" required />
       </label>
 
       <button type="submit" :disabled="auth.loading">
-        {{ auth.loading ? '로그인 중…' : '로그인' }}
+        {{ auth.loading ? '가입 중…' : '회원가입' }}
       </button>
 
-      <button type="button" class="secondary" :disabled="auth.loading" @click="goRegister">
-        회원가입
+      <button type="button" class="secondary" :disabled="auth.loading" @click="goLogin">
+        로그인으로 돌아가기
       </button>
 
-      <p v-if="auth.error" class="error">로그인 실패: {{ auth.error }}</p>
+      <p v-if="localError" class="error">{{ localError }}</p>
+      <p v-else-if="auth.error" class="error">
+        회원가입 실패: {{ auth.error === 'email_taken' ? '이미 사용 중인 이메일입니다.' : auth.error }}
+      </p>
     </form>
   </div>
 </template>
@@ -117,5 +140,4 @@ button.secondary:disabled { background: #fff; color: #94a3b8; border-color: #cbd
   font-weight: 500;
 }
 .home-link:hover { color: #0ea5e9; }
-code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; }
 </style>

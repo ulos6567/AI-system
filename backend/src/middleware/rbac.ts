@@ -31,8 +31,29 @@ export function requireRole(...roles: EffectiveRole[]): RequestHandler {
 }
 
 /**
- * URL 파라미터 :storeId 가 사용자의 점포 스코프에 포함되는지 검사.
- *   SUPER_ADMIN / HQ_OPERATOR 는 통과.
+ * 쓰기 가드 — 본사급 관리자(SUPER_ADMIN / HQ_OPERATOR)만 통과.
+ *   점주(STORE_OWNER)·직원(STORE_STAFF)·신규 가입자(STORE_USER)는 모두 읽기 전용.
+ *   발주 승인, 가격 룰 변경, 매핑 수정 등 모든 운영 데이터 변경 동작에 적용. (운영 정책)
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  const user = getUser(req);
+  if (!user) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  if (user.globalRole === 'SUPER_ADMIN' || user.globalRole === 'HQ_OPERATOR') {
+    next();
+    return;
+  }
+  res.status(403).json({ error: 'admin_required', requires: ['SUPER_ADMIN', 'HQ_OPERATOR'] });
+}
+
+/**
+ * 점포 스코프 가드 (읽기 허용 정책).
+ *   - 로그인한 사용자는 누구나 점포 데이터를 "조회(GET)"할 수 있다 — 열람 전용 방문자 포함.
+ *   - 데이터를 변경하는 쓰기 라우트에는 이 가드 뒤에 항상 `requireAdmin` 이 붙어
+ *     SUPER_ADMIN / HQ_OPERATOR 만 통과하므로, 여기서 막지 않아도 쓰기는 안전하게 차단된다.
+ *   - storeId 파라미터의 형식만 검증한다.
  */
 export function requireStoreScope(paramName = 'storeId'): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -41,17 +62,9 @@ export function requireStoreScope(paramName = 'storeId'): RequestHandler {
       res.status(401).json({ error: 'unauthorized' });
       return;
     }
-    if (user.globalRole === 'SUPER_ADMIN' || user.globalRole === 'HQ_OPERATOR') {
-      return next();
-    }
     const storeId = Number(req.params[paramName]);
     if (!Number.isFinite(storeId)) {
       res.status(400).json({ error: 'invalid_store_id' });
-      return;
-    }
-    const allowed = user.stores.some((s) => s.storeId === storeId);
-    if (!allowed) {
-      res.status(403).json({ error: 'forbidden_store_scope', storeId });
       return;
     }
     next();

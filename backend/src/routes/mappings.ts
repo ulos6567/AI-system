@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth/jwt';
-import { requireStoreScope, requireRole } from '../middleware/rbac';
+import { requireStoreScope, requireAdmin } from '../middleware/rbac';
 import { getPool } from '../db/pool';
 import { audit } from '../lib/audit';
 import { upsertMapping } from '../services/product-mapping';
@@ -44,7 +44,7 @@ const PatchSchema = z.object({
   productMasterId: z.number().int().optional(),
 });
 
-router.patch('/:id', requireAuth, requireStoreScope(), requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+router.patch('/:id', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const id = Number(req.params.id);
   const parsed = PatchSchema.safeParse(req.body);
@@ -87,7 +87,7 @@ router.patch('/:id', requireAuth, requireStoreScope(), requireRole('STORE_OWNER'
   res.json({ ok: true, id });
 });
 
-router.post('/auto-rerun', requireAuth, requireStoreScope(), requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+router.post('/auto-rerun', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const pool = getPool();
   const [pending] = await pool.query<any[]>(

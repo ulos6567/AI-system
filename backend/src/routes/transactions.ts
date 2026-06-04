@@ -117,6 +117,7 @@ router.get('/', requireAuth, requireStoreScope(), async (req, res) => {
   res.json({ storeId, transactions: rows });
 });
 
+// 셀프 계산대 결제(거래 생성)는 로그인한 사용자라면 누구나 가능 — 관리 동작이 아니므로 requireAdmin 제외.
 router.post('/ingest', requireAuth, requireStoreScope(), async (req, res) => {
   const storeId = Number(req.params.storeId);
   const pos = getPosAdapter();

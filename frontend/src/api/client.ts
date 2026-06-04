@@ -18,19 +18,20 @@ export function setUnauthorizedHandler(fn: () => void): void {
 
 export async function api<T = unknown>(
   path: string,
-  init: RequestInit = {},
+  init: RequestInit & { skipUnauthorizedHandler?: boolean } = {},
 ): Promise<T> {
   const headers = new Headers(init.headers ?? {});
   if (init.body && !headers.has('content-type') && typeof init.body === 'string') {
     headers.set('content-type', 'application/json');
   }
+  const { skipUnauthorizedHandler, ...fetchInit } = init;
   const res = await fetch(`${BASE}${path}`, {
-    ...init,
+    ...fetchInit,
     headers,
     credentials: 'include',
   });
   if (res.status === 401) {
-    onUnauthorized?.();
+    if (!skipUnauthorizedHandler && path !== '/auth/me') onUnauthorized?.();
     throw new ApiError(401, 'unauthorized');
   }
   const ct = res.headers.get('content-type') ?? '';

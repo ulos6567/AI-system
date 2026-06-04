@@ -134,7 +134,7 @@ function pctDelta(now: number | null | undefined, prev: number | null | undefine
   <div class="reports-view">
     <header class="page-header">
       <div>
-        <h2>운영 성과 리포트</h2>
+        <h2>경영 리포트</h2>
         <p class="subtitle">점포 #{{ storeId }} · {{ from }} ~ {{ to }}</p>
       </div>
       <div class="actions">
@@ -143,7 +143,7 @@ function pctDelta(now: number | null | undefined, prev: number | null | undefine
         <label class="check">
           <input v-model="compareEnabled" type="checkbox" /> 기간 비교
         </label>
-        <button class="ghost" :disabled="busy" @click="doBackfill">
+        <button v-if="auth.isAdmin" class="ghost" :disabled="busy" @click="doBackfill">
           {{ busy ? '집계 중…' : '재집계' }}
         </button>
       </div>

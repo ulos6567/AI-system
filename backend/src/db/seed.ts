@@ -53,10 +53,21 @@ async function seedDemoUsers(): Promise<void> {
 }
 
 function splitStatements(sql: string): string[] {
-  return sql
-    .split(/;\s*(?:\n|$)/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith('--'));
+  const out: string[] = [];
+  let cur = '';
+  for (const raw of sql.split(/\r?\n/)) {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('--')) continue;
+    cur += raw + '\n';
+    if (trimmed.endsWith(';')) {
+      const stmt = cur.replace(/;\s*$/, '').trim();
+      if (stmt) out.push(stmt);
+      cur = '';
+    }
+  }
+  const tail = cur.trim();
+  if (tail) out.push(tail.replace(/;\s*$/, ''));
+  return out;
 }
 
 async function applyFile(filename: string): Promise<void> {

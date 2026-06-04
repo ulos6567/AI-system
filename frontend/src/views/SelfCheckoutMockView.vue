@@ -142,10 +142,10 @@ function quickAdd(code: string): void {
   <div class="kiosk-view">
     <header class="page-header">
       <div>
-        <h2>셀프 결제 (모의)</h2>
+        <h2>셀프 계산대 (모의)</h2>
         <p class="subtitle">점포 #{{ storeId }} · 바코드 또는 로컬코드 입력</p>
       </div>
-      <button class="ghost" :class="{ on: visionStatus }" @click="toggleVision">
+      <button v-if="auth.isAdmin" class="ghost" :class="{ on: visionStatus }" @click="toggleVision">
         Vision Mock {{ visionStatus ? '⏹ 정지' : '▶ 시작' }}
       </button>
     </header>
@@ -309,6 +309,7 @@ button.xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; }
 .toast { background: #ecfdf5; color: #065f46; padding: 0.7rem 0.9rem; border-radius: 6px; margin-top: 0.75rem; font-weight: 600; font-size: 0.9rem; }
 .toast.warn { background: #fef3c7; color: #92400e; }
 .muted { color: #94a3b8; }
+.readonly-hint { font-size: 0.8rem; color: #793400; font-weight: 600; align-self: center; }
 .small { font-size: 0.78rem; }
 h4 { margin: 0 0 0.5rem; font-size: 0.9rem; color: #475569; }
 

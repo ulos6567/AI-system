@@ -152,10 +152,10 @@ function actionLabel(a: ActionType): string {
   <div class="pricing-rules-view">
     <header class="page-header">
       <div>
-        <h2>가격 룰 관리</h2>
+        <h2>가격 정책</h2>
         <p class="subtitle">{{ pricing.rules.length }}건 · 점포 #{{ storeId }}</p>
       </div>
-      <button class="primary" @click="startNew">+ 새 룰</button>
+      <button v-if="auth.isAdmin" class="primary" @click="startNew">+ 새 룰</button>
     </header>
 
     <section v-if="evalResult" class="toast">
@@ -221,11 +221,14 @@ function actionLabel(a: ActionType): string {
             <td class="muted">{{ r.storeId ?? '전사' }}</td>
             <td>{{ r.isActive ? '✅' : '⏸️' }}</td>
             <td class="row-actions">
-              <button class="primary sm" :disabled="evaluatingId === r.id" @click="evaluateNow(r.id)">
-                {{ evaluatingId === r.id ? '평가 중…' : '평가' }}
-              </button>
-              <button class="ghost sm" @click="editRule(r.id)">수정</button>
-              <button class="ghost sm danger" @click="remove(r.id)">삭제</button>
+              <template v-if="auth.isAdmin">
+                <button class="primary sm" :disabled="evaluatingId === r.id" @click="evaluateNow(r.id)">
+                  {{ evaluatingId === r.id ? '평가 중…' : '평가' }}
+                </button>
+                <button class="ghost sm" @click="editRule(r.id)">수정</button>
+                <button class="ghost sm danger" @click="remove(r.id)">삭제</button>
+              </template>
+              <span v-else class="readonly-hint">열람 전용</span>
             </td>
           </tr>
         </tbody>
@@ -260,6 +263,7 @@ h3 { margin: 0; font-size: 1.05rem; }
 .rules-table th { background: #f8fafc; color: #475569; font-weight: 600; }
 .rules-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .rules-table .muted { color: #94a3b8; }
+.readonly-hint { font-size: 0.72rem; color: #a4a097; font-style: italic; }
 .row-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 .badge { background: #ede9fe; color: #5b21b6; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
 

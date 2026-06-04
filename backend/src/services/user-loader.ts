@@ -32,3 +32,32 @@ export async function touchLastLogin(userId: number): Promise<void> {
   const pool = getPool();
   await pool.query('UPDATE `user` SET last_login_at = NOW() WHERE id = ?', [userId]);
 }
+
+export async function emailExists(email: string): Promise<boolean> {
+  const pool = getPool();
+  const [rows] = await pool.query<any[]>('SELECT id FROM `user` WHERE email = ?', [email]);
+  return rows.length > 0;
+}
+
+/**
+ * 신규 사용자 생성 — 회원가입 기본 권한은 STORE_USER, 점포 매핑 없음.
+ * 반환값은 로그인 직후와 동일한 SessionUser 형태.
+ */
+export async function createUser(input: {
+  email: string;
+  passwordHash: string;
+  displayName: string;
+}): Promise<SessionUser> {
+  const pool = getPool();
+  const [result] = await pool.query<any>(
+    'INSERT INTO `user` (email, password_hash, display_name, global_role) VALUES (?, ?, ?, ?)',
+    [input.email, input.passwordHash, input.displayName, 'STORE_USER'],
+  );
+  return {
+    id: result.insertId,
+    email: input.email,
+    displayName: input.displayName,
+    globalRole: 'STORE_USER',
+    stores: [],
+  };
+}

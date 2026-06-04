@@ -76,10 +76,10 @@ const counts = computed(() => {
   <div class="mappings-view">
     <header class="page-header">
       <div>
-        <h2>상품 매핑 검토</h2>
+        <h2>상품 매핑</h2>
         <p class="subtitle">점포 #{{ storeId }} · {{ mappings.length }}건</p>
       </div>
-      <button class="ghost" @click="rerun">미해소 재매핑 시도</button>
+      <button v-if="auth.isAdmin" class="ghost" @click="rerun">미해소 재매핑 시도</button>
     </header>
 
     <section class="filter-bar">
@@ -110,11 +110,14 @@ const counts = computed(() => {
             <td class="num">{{ (m.confidence * 100).toFixed(0) }}%</td>
             <td><span class="badge" :data-status="m.status">{{ m.status }}</span></td>
             <td class="actions">
-              <button v-if="m.status !== 'confirmed' && m.productMasterId" class="primary xs" @click="patch(m.id, { action: 'confirm' })">확정</button>
-              <button v-if="m.status !== 'rejected'" class="ghost xs" @click="patch(m.id, { action: 'reject' })">거부</button>
-              <button class="ghost xs" @click="reassignId = m.id">재할당</button>
+              <template v-if="auth.isAdmin">
+                <button v-if="m.status !== 'confirmed' && m.productMasterId" class="primary xs" @click="patch(m.id, { action: 'confirm' })">확정</button>
+                <button v-if="m.status !== 'rejected'" class="ghost xs" @click="patch(m.id, { action: 'reject' })">거부</button>
+                <button class="ghost xs" @click="reassignId = m.id">재할당</button>
+              </template>
+              <span v-else class="readonly-hint">열람 전용</span>
 
-              <div v-if="reassignId === m.id" class="reassign-popover">
+              <div v-if="auth.isAdmin && reassignId === m.id" class="reassign-popover">
                 <input v-model.number="reassignTarget" type="number" placeholder="master id" />
                 <button class="primary xs" @click="submitReassign(m.id)">적용</button>
                 <button class="ghost xs" @click="reassignId = null">취소</button>
@@ -145,6 +148,7 @@ h2 { margin: 0; font-size: 1.35rem; }
 .map-table th { background: #f8fafc; color: #475569; font-weight: 600; }
 .map-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .map-table .muted { color: #94a3b8; }
+.readonly-hint { font-size: 0.72rem; color: #a4a097; font-style: italic; }
 .map-table tr.s-pending td { background: #fffbeb; }
 .map-table tr.s-rejected td { background: #fef2f2; }
 

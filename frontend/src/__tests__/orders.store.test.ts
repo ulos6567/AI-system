@@ -20,7 +20,7 @@ vi.mock('@/api/orders', () => ({
 import { useOrdersStore } from '@/stores/orders';
 
 describe('orders store', () => {
-  beforeEach(() => setActivePinia(createPinia()));
+  beforeEach(() => { setActivePinia(createPinia()); });
 
   it('generateAuto sets lastResult', async () => {
     const s = useOrdersStore();

@@ -8,7 +8,7 @@
  */
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth/jwt';
-import { requireStoreScope, requireRole } from '../middleware/rbac';
+import { requireStoreScope, requireAdmin } from '../middleware/rbac';
 import { getVisionAdapter } from '../adapters/factory';
 import { isCapturing } from '../adapters/vision/mock';
 import { getPool } from '../db/pool';
@@ -16,14 +16,14 @@ import { getPool } from '../db/pool';
 const visionRouter = Router({ mergeParams: true });
 const analyticsRouter = Router({ mergeParams: true });
 
-visionRouter.post('/start', requireAuth, requireStoreScope(), requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+visionRouter.post('/start', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const adapter = getVisionAdapter();
   await adapter.startCapture(storeId, async () => undefined);
   res.json({ ok: true, storeId, capturing: true });
 });
 
-visionRouter.post('/stop', requireAuth, requireStoreScope(), requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+visionRouter.post('/stop', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const adapter = getVisionAdapter();
   await adapter.stopCapture(storeId);

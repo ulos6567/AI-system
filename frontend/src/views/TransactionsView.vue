@@ -108,7 +108,7 @@ const avgTicket = computed(() => totalTx.value ? totalRevenue.value / totalTx.va
   <div class="tx-view">
     <header class="page-header">
       <div>
-        <h2>거래·매출</h2>
+        <h2>매출 현황</h2>
         <p class="subtitle">점포 #{{ storeId }} · {{ from }} ~ {{ to }}</p>
       </div>
     </header>

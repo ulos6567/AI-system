@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth/jwt';
-import { requireRole, requireStoreScope } from '../middleware/rbac';
+import { requireAdmin, requireStoreScope } from '../middleware/rbac';
 import { getPool } from '../db/pool';
 import { audit } from '../lib/audit';
 import { evaluateRule, listPricingEvents } from '../services/pricing';
@@ -51,7 +51,7 @@ rulesRouter.get('/rules', requireAuth, async (req, res) => {
   res.json({ rules: rows });
 });
 
-rulesRouter.post('/rules', requireAuth, requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+rulesRouter.post('/rules', requireAuth, requireAdmin, async (req, res) => {
   const parsed = RuleSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'invalid_payload', detail: parsed.error.flatten() });
@@ -83,7 +83,7 @@ rulesRouter.post('/rules', requireAuth, requireRole('STORE_OWNER', 'HQ_OPERATOR'
   res.json({ id, ok: true });
 });
 
-rulesRouter.patch('/rules/:id', requireAuth, requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+rulesRouter.patch('/rules/:id', requireAuth, requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const parsed = RuleUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -111,7 +111,7 @@ rulesRouter.patch('/rules/:id', requireAuth, requireRole('STORE_OWNER', 'HQ_OPER
   res.json({ id, ok: true });
 });
 
-rulesRouter.delete('/rules/:id', requireAuth, requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+rulesRouter.delete('/rules/:id', requireAuth, requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const pool = getPool();
   await pool.query(`DELETE FROM pricing_rule WHERE id = ?`, [id]);
@@ -120,7 +120,7 @@ rulesRouter.delete('/rules/:id', requireAuth, requireRole('STORE_OWNER', 'HQ_OPE
 });
 
 // POST /api/pricing/rules/:id/evaluate { storeId? }  — 즉시 1회 평가 (수동/검증용)
-rulesRouter.post('/rules/:id/evaluate', requireAuth, requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+rulesRouter.post('/rules/:id/evaluate', requireAuth, requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const storeIdOverride = req.body?.storeId ? Number(req.body.storeId) : undefined;
   try {

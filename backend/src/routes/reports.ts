@@ -7,7 +7,7 @@
  */
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth/jwt';
-import { requireStoreScope, requireRole } from '../middleware/rbac';
+import { requireStoreScope, requireAdmin } from '../middleware/rbac';
 import { listDailyReports, backfillRange } from '../services/kpi';
 
 const router = Router({ mergeParams: true });
@@ -62,7 +62,7 @@ router.get('/daily', requireAuth, requireStoreScope(), async (req, res) => {
   });
 });
 
-router.post('/backfill', requireAuth, requireStoreScope(), requireRole('STORE_OWNER', 'HQ_OPERATOR'), async (req, res) => {
+router.post('/backfill', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const from = parseDate(req.body?.from, new Date(Date.now() - 27 * 86400_000));
   const to = parseDate(req.body?.to, new Date());

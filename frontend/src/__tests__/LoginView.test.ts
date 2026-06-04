@@ -17,13 +17,30 @@ vi.mock('@/api/auth', () => ({
 import LoginView from '@/views/LoginView.vue';
 
 describe('LoginView', () => {
-  it('renders email and password fields with demo defaults', () => {
+  it('renders empty email and password fields (no auto-filled credentials)', () => {
     setActivePinia(createPinia());
-    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/orders', name: 'orders', component: { template: '<div/>' } }] });
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/orders', name: 'orders', component: { template: '<div/>' } },
+      { path: '/register', name: 'register', component: { template: '<div/>' } },
+    ] });
     const wrapper = mount(LoginView, { global: { plugins: [router] } });
     const inputs = wrapper.findAll('input');
     expect(inputs.length).toBe(2);
-    expect((inputs[0].element as HTMLInputElement).value).toBe('store_owner_demo@example.com');
-    expect((inputs[1].element as HTMLInputElement).value).toBe('demo1234');
+    expect((inputs[0].element as HTMLInputElement).value).toBe('');
+    expect((inputs[1].element as HTMLInputElement).value).toBe('');
+  });
+
+  it('shows a 회원가입 button that navigates to the register route', async () => {
+    setActivePinia(createPinia());
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/orders', name: 'orders', component: { template: '<div/>' } },
+      { path: '/register', name: 'register', component: { template: '<div/>' } },
+    ] });
+    const wrapper = mount(LoginView, { global: { plugins: [router] } });
+    const registerBtn = wrapper.findAll('button').find((b) => b.text().includes('회원가입'));
+    expect(registerBtn).toBeTruthy();
+    await registerBtn!.trigger('click');
+    await router.isReady();
+    expect(router.currentRoute.value.name).toBe('register');
   });
 });

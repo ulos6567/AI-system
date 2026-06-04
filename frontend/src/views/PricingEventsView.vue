@@ -22,7 +22,7 @@ function eslColor(s: string): string {
   <div class="pricing-events-view">
     <header class="page-header">
       <div>
-        <h2>가격 적용 이력</h2>
+        <h2>가격 변동 이력</h2>
         <p class="subtitle">점포 #{{ storeId }} · {{ pricing.events.length }}건</p>
       </div>
       <button class="ghost" @click="pricing.refreshEvents(storeId)">새로고침</button>

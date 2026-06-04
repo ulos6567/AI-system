@@ -21,7 +21,7 @@ vi.mock('@/api/auth', () => ({
 import { useAuthStore } from '@/stores/auth';
 
 describe('auth store', () => {
-  beforeEach(() => setActivePinia(createPinia()));
+  beforeEach(() => { setActivePinia(createPinia()); });
 
   it('logs in and sets user', async () => {
     const auth = useAuthStore();

@@ -4,7 +4,7 @@
  */
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth/jwt';
-import { requireStoreScope } from '../middleware/rbac';
+import { requireStoreScope, requireAdmin } from '../middleware/rbac';
 import { forecastStoreFor, listLatestForecasts } from '../services/forecast';
 
 const router = Router({ mergeParams: true });
@@ -24,7 +24,7 @@ router.get('/', requireAuth, requireStoreScope(), async (req, res) => {
   res.json({ storeId, targetDate: date.toISOString().slice(0, 10), forecasts: rows });
 });
 
-router.post('/generate', requireAuth, requireStoreScope(), async (req, res) => {
+router.post('/generate', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const date = parseDate(req.body?.date);
   const rows = await forecastStoreFor(storeId, date);

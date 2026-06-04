@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth/jwt';
-import { requireStoreScope } from '../middleware/rbac';
+import { requireStoreScope, requireAdmin } from '../middleware/rbac';
 import { getPool } from '../db/pool';
 import { audit } from '../lib/audit';
 import { generateAutoOrder, approveAndSend } from '../services/auto-order';
@@ -73,7 +73,7 @@ router.get('/:id', requireAuth, requireStoreScope(), async (req, res) => {
   res.json({ order: orders[0], items });
 });
 
-router.post('/auto-generate', requireAuth, requireStoreScope(), async (req, res) => {
+router.post('/auto-generate', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const userId = currentUserId(req);
   const result = await generateAutoOrder({ storeId, userId, targetDate: req.body?.date ? new Date(req.body.date) : undefined });
@@ -85,7 +85,7 @@ const PatchSchema = z.object({
   items: z.array(z.object({ id: z.number().int(), orderedQuantity: z.number().int().min(0) })).optional(),
 });
 
-router.patch('/:id', requireAuth, requireStoreScope(), async (req, res) => {
+router.patch('/:id', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
   const storeId = Number(req.params.storeId);
   const id = Number(req.params.id);
   const userId = currentUserId(req);

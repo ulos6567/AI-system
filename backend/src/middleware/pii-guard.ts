@@ -5,7 +5,7 @@
  *   - 통과/거부 모두 audit (`pii.access_granted` / `pii.access_denied`) — 누가 어떤 자원에 접근했는지 추적 가능.
  *   - 1차 구현은 글로벌 역할만으로 판단 (PII_ACCESS 별도 권한 테이블은 후속).
  */
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { Request, RequestHandler } from 'express';
 import { audit } from '../lib/audit';
 import type { SessionUser } from './auth/session';
 
