@@ -43,6 +43,16 @@ export const config = {
     logistics: optional('ADAPTER_LOGISTICS', 'mock'),
     signal: optional('ADAPTER_SIGNAL', 'mock'),
     vision: optional('ADAPTER_VISION', 'mock'),
+    // 002 intelligence layer (simulation by default)
+    anomaly: optional('ADAPTER_ANOMALY', 'sim'),
+    iot: optional('ADAPTER_IOT', 'sim'),
+    llm: optional('ADAPTER_LLM', 'mock'),
+  },
+
+  llm: {
+    apiKey: optional('LLM_API_KEY', ''),
+    apiBase: optional('LLM_API_BASE', ''),
+    model: optional('LLM_MODEL', ''),
   },
 };
 

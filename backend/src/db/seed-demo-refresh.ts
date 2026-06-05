@@ -98,6 +98,9 @@ async function wipeStoreData(storeId: number): Promise<void> {
   await pool.query('DELETE FROM demand_forecast WHERE store_id = ?', [storeId]);
   await pool.query('DELETE FROM performance_kpi_daily WHERE store_id = ?', [storeId]);
   await pool.query('DELETE FROM inventory WHERE store_id = ?', [storeId]);
+  // 스케줄러 데모 — work_schedule 삭제 시 work_shift 는 FK CASCADE, 이후 employee 삭제
+  await pool.query('DELETE FROM work_schedule WHERE store_id = ?', [storeId]);
+  await pool.query('DELETE FROM employee WHERE store_id = ?', [storeId]);
 }
 
 /** 오늘 기준 신선한 재고 — 유통기한 임박/저재고/결품을 의도적으로 섞는다. */
@@ -296,6 +299,137 @@ function addHours(d: Date, h: number): Date {
   return x;
 }
 
+// 카테고리 → 실제 이미지 키워드 / 대체 이미지 키워드 (loremflickr 안정 시드)
+const CATEGORY_IMG: Record<string, { real: string; fallback: string }> = {
+  beverage: { real: 'drink,beverage,bottle', fallback: 'drink' },
+  snack: { real: 'snack,chips,cookie', fallback: 'snack' },
+  lunchbox: { real: 'lunchbox,bento,meal', fallback: 'food' },
+  ricesnack: { real: 'riceball,onigiri,rice', fallback: 'rice' },
+  instant: { real: 'noodle,ramen,instant', fallback: 'noodle' },
+  frozen: { real: 'frozen,icecream,food', fallback: 'food' },
+};
+
+function imgUrl(keyword: string, lock: number): string {
+  return `https://loremflickr.com/320/240/${keyword}?lock=${lock}`;
+}
+
+/**
+ * 002 (T021) — 상품 미디어 시드 (실제 이미지 + 카테고리 대체).
+ *   - 약 85% 상품은 실제 이미지(is_fallback=0)를 보유한다.
+ *   - 나머지 ~15% 는 실제 이미지가 없어 대체 이미지 경로를 검증한다.
+ *   - 모든 카테고리에 대체 이미지(is_fallback=1) 1건을 보장한다.
+ *   product_media 는 상품 마스터(전역) 기준 — 점포 루프 밖에서 1회만 시드한다.
+ */
+async function seedProductMedia(): Promise<void> {
+  const pool = getPool();
+  await pool.query('DELETE FROM product_media');
+  const rows: any[][] = []; // [product_id, image_url, is_fallback, sort_order]
+  for (const id of PRODUCT_IDS) {
+    const cat = PRODUCTS[id].cat;
+    const km = CATEGORY_IMG[cat] ?? { real: 'product', fallback: 'product' };
+    // 카테고리 대체 이미지(공통) — 항상 보유
+    rows.push([id, imgUrl(km.fallback, 1000 + (cat.charCodeAt(0) % 50)), 1, 1]);
+    // 실제 이미지 — 약 85% 상품만 보유 (id % 7 === 0 인 상품은 실제 이미지 없음 → 대체 경로 검증)
+    if (id % 7 !== 0) {
+      rows.push([id, imgUrl(km.real, id), 0, 0]);
+    }
+  }
+  await pool.query(
+    'INSERT INTO product_media (product_id, image_url, is_fallback, sort_order) VALUES ?',
+    [rows],
+  );
+  const withReal = PRODUCT_IDS.filter((id) => id % 7 !== 0).length;
+  logger.info(
+    { products: PRODUCT_IDS.length, withRealImage: withReal, fallbackOnly: PRODUCT_IDS.length - withReal },
+    'product media seeded',
+  );
+}
+
+/**
+ * 002 (US6) — 장비·센서 측정 이력 시드.
+ *   점포별 냉장/쇼케이스/냉동/공조 장비 + 최근 24시간 시간별 측정값(일부 장비는 악화 추세).
+ *   악화 장비가 임계 추세를 보이도록 해 예지보전 경고가 트리거되게 한다.
+ */
+async function seedDevices(storeId: number, now: Date): Promise<void> {
+  const pool = getPool();
+  // 기존 장비/측정 삭제(데모 멱등) — device_reading/maintenance_alert 는 FK CASCADE
+  await pool.query('DELETE FROM device WHERE store_id = ?', [storeId]);
+
+  const SPEC: Record<string, { tempMin: number; tempMax: number; power: number }> = {
+    fridge: { tempMin: 1, tempMax: 5, power: 150 },
+    showcase: { tempMin: 2, tempMax: 6, power: 180 },
+    freezer: { tempMin: -20, tempMax: -15, power: 320 },
+    hvac: { tempMin: 18, tempMax: 26, power: 800 },
+  };
+  const defs: Array<{ type: keyof typeof SPEC; label: string }> = [
+    { type: 'fridge', label: '음료 냉장고 1' },
+    { type: 'showcase', label: '도시락 쇼케이스' },
+    { type: 'freezer', label: '냉동고 1' },
+    { type: 'hvac', label: '매장 공조기' },
+  ];
+
+  for (let i = 0; i < defs.length; i++) {
+    const d = defs[i];
+    const spec = SPEC[d.type];
+    const [r]: any = await pool.query(
+      `INSERT INTO device (store_id, device_type, label, spec_json, status)
+       VALUES (?, ?, ?, ?, 'normal')`,
+      [storeId, d.type, d.label, JSON.stringify(spec)],
+    );
+    const deviceId = r.insertId as number;
+    // 최근 24시간 시간별 측정값
+    const degrading = deviceId % 4 === 0; // 일부 장비 악화 추세
+    const rows: any[][] = [];
+    for (let h = 24; h >= 0; h--) {
+      const at = new Date(now.getTime() - h * 3600_000);
+      const drift = degrading ? (24 - h) * 0.4 : 0; // 시간이 지날수록 상승
+      const temp = Math.round((spec.tempMin + Math.random() * (spec.tempMax - spec.tempMin) + drift) * 10) / 10;
+      const power = Math.round((spec.power * (0.9 + Math.random() * 0.2) + drift * 8) * 10) / 10;
+      rows.push([deviceId, datetime(at), temp, power]);
+    }
+    await pool.query(
+      'INSERT INTO device_reading (device_id, reading_at, temperature, power_watt) VALUES ?',
+      [rows],
+    );
+  }
+  logger.info({ storeId, devices: defs.length }, 'devices seeded');
+}
+
+/**
+ * 스케줄러 데모용 직원 시드 — 점포별 6명, 다양한 가용성(전일/평일오전/주말/저녁).
+ *   availability_json: { days:[0..6], startHour, endHour } (스케줄러 계약과 일치)
+ */
+async function seedEmployees(storeId: number): Promise<void> {
+  const pool = getPool();
+  const NAMES = ['김민준', '이서연', '박지후', '최예린', '정도윤', '강하은', '윤시우', '임수아'];
+  // 점포 규모에 따라 직원 수 차등(붐비는 점포일수록 많이)
+  const count = storeId === 1 ? 7 : storeId === 3 ? 6 : 5;
+  const profiles = [
+    { days: [0, 1, 2, 3, 4, 5, 6], startHour: 0, endHour: 24, wage: 11500 }, // 풀타임
+    { days: [1, 2, 3, 4, 5], startHour: 7, endHour: 15, wage: 11000 }, // 평일 오전
+    { days: [1, 2, 3, 4, 5], startHour: 14, endHour: 22, wage: 11000 }, // 평일 저녁
+    { days: [0, 6], startHour: 7, endHour: 22, wage: 12000 }, // 주말 전담
+    { days: [0, 1, 2, 3, 4, 5, 6], startHour: 11, endHour: 22, wage: 11200 }, // 오후~마감
+    { days: [2, 3, 4, 5, 6], startHour: 7, endHour: 19, wage: 11000 }, // 화~토 주간
+    { days: [0, 1, 2, 3, 4, 5, 6], startHour: 0, endHour: 24, wage: 11800 }, // 풀타임2
+  ];
+  const rows: any[][] = [];
+  for (let i = 0; i < count; i++) {
+    const p = profiles[i % profiles.length];
+    rows.push([
+      storeId,
+      NAMES[i % NAMES.length],
+      p.wage,
+      JSON.stringify({ days: p.days, startHour: p.startHour, endHour: p.endHour }),
+    ]);
+  }
+  await pool.query(
+    'INSERT INTO employee (store_id, name, hourly_wage, availability_json) VALUES ?',
+    [rows],
+  );
+  logger.info({ storeId, employees: count }, 'employees seeded');
+}
+
 async function main(): Promise<void> {
   const pool = getPool();
   const today = new Date();
@@ -307,6 +441,9 @@ async function main(): Promise<void> {
   );
   const adminUserId = adminRows.length ? Number(adminRows[0].id) : null;
 
+  // 상품 미디어(전역) 1회 시드 — 대시보드/목록 이미지 100% 보장 (T021, SC-009)
+  await seedProductMedia();
+
   for (const storeId of STORES) {
     logger.info({ storeId }, 'refreshing demo data');
     await wipeStoreData(storeId);
@@ -314,6 +451,8 @@ async function main(): Promise<void> {
     await seedTransactions(storeId, today);
     await seedDiscards(storeId, today);
     await seedOrders(storeId, today, adminUserId);
+    await seedDevices(storeId, new Date());
+    await seedEmployees(storeId);
     // 거래 이력 기반 내일자 수요예측
     await forecastStoreFor(storeId, tomorrow);
     // 최근 30일 KPI 일별 집계 (매출 리포트)

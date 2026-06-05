@@ -4,6 +4,13 @@
     "logout": "로그아웃"
   },
   "nav": {
+    "dashboard": "운영 대시보드",
+    "insights": "처방형 인사이트",
+    "anomalies": "이상 징후 감지",
+    "assistant": "AI 경영비서",
+    "analytics": "매장 행동 분석",
+    "devices": "장비 예지보전",
+    "schedule": "인력 스케줄러",
     "orders": "발주",
     "inventory": "재고",
     "transactions": "거래/매출",

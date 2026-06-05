@@ -1,0 +1,404 @@
+openapi: 3.0.3
+info:
+  title: AI Intelligence & Prescriptive Operations Suite API
+  version: 0.1.0
+  description: >
+    002 인텔리전스 계층 신규 엔드포인트. 001 플랫폼 위에 증분 추가되며 동일한
+    세션/RBAC 인증과 SSE 알림 채널을 재사용한다. 모든 경로는 `/api` 프리픽스를
+    가지며, 점포 스코프는 인증 컨텍스트에서 결정된다.
+servers:
+  - url: /api
+tags:
+  - name: insights
+  - name: analytics
+  - name: anomalies
+  - name: devices
+  - name: assistant
+  - name: schedules
+  - name: media
+
+paths:
+  /insights/signals:
+    get:
+      tags: [insights]
+      summary: 운영 신호 목록 (FR-001)
+      parameters:
+        - { name: store_id, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string, enum: [open, actioned, dismissed, expired] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OperationalSignal" }
+
+  /insights/actions:
+    get:
+      tags: [insights]
+      summary: 처방 액션 목록 (우선순위 정렬, FR-002)
+      parameters:
+        - { name: store_id, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string, enum: [proposed, approved, executed, rejected, expired] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PrescriptiveAction" }
+
+  /insights/actions/{id}/approve:
+    post:
+      tags: [insights]
+      summary: 처방 승인 후 실행 (FR-003, 점주 승인 필수)
+      description: >
+        처방을 승인하고 001의 가격/발주 실행 경로를 호출한다. 자동 실행 경로는
+        존재하지 않으며 이 엔드포인트만이 executed 상태로 전이시킨다.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                overrides:
+                  type: object
+                  description: 수정 후 실행 시 변경할 권고 값
+      responses:
+        "200":
+          description: 승인·실행됨
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PrescriptiveAction" }
+        "409": { description: 이미 처리된 처방 }
+
+  /insights/actions/{id}/reject:
+    post:
+      tags: [insights]
+      summary: 처방 거절 (사유 포함, FR-003)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 255 }
+      responses:
+        "200": { description: 거절됨 }
+
+  /insights/actions/{id}/outcome:
+    get:
+      tags: [insights]
+      summary: 처방 효과 검증 리포트 (FR-004, SC-002)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActionOutcome" }
+        "404": { description: 아직 검증 전 }
+
+  /analytics/heatmap:
+    get:
+      tags: [analytics]
+      summary: 매대 히트맵 집계 (FR-011, 시뮬레이션 데이터)
+      parameters:
+        - { name: store_id, in: query, schema: { type: integer } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BehaviorInsight" }
+
+  /analytics/behavior:
+    get:
+      tags: [analytics]
+      summary: 비식별 행동/선호 통계 (FR-013)
+      parameters:
+        - { name: store_id, in: query, schema: { type: integer } }
+      responses:
+        "200": { description: OK }
+
+  /anomalies:
+    get:
+      tags: [anomalies]
+      summary: 이상 이벤트 목록 (FR-014, 시뮬레이션)
+      parameters:
+        - { name: store_id, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AnomalyEvent" }
+
+  /anomalies/{id}/feedback:
+    post:
+      tags: [anomalies]
+      summary: 오탐 피드백 (FR-016, SC-006)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [false_positive]
+              properties:
+                false_positive: { type: boolean }
+                resolution: { type: string }
+      responses:
+        "200": { description: 기록됨 }
+
+  /devices:
+    get:
+      tags: [devices]
+      summary: 장비 목록·상태 (FR-017, 시뮬레이션)
+      parameters:
+        - { name: store_id, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Device" }
+
+  /devices/{id}/health:
+    get:
+      tags: [devices]
+      summary: 장비 상태·예지보전 경고 (FR-017, FR-018)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeviceHealth" }
+
+  /assistant/conversations:
+    post:
+      tags: [assistant]
+      summary: 대화 시작
+      responses:
+        "201":
+          description: 생성됨
+          content:
+            application/json:
+              schema: { type: object, properties: { id: { type: integer } } }
+
+  /assistant/conversations/{id}/messages:
+    post:
+      tags: [assistant]
+      summary: 질의 전송·LLM 응답 (FR-019~021, 근거 동반)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        "200":
+          description: 답변(근거 포함). 근거 없으면 had_grounding=false, "데이터 없음".
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantMessage" }
+
+  /schedules/generate:
+    post:
+      tags: [schedules]
+      summary: 근무 스케줄 초안 자동 생성 (FR-022, FR-023)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [store_id, week_start]
+              properties:
+                store_id: { type: integer }
+                week_start: { type: string, format: date }
+      responses:
+        "200":
+          description: 초안(제약 위반 시 명시)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkSchedule" }
+
+  /schedules/{id}/confirm:
+    post:
+      tags: [schedules]
+      summary: 스케줄 확정 (FR-024, 예상 인건비 포함)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: 확정됨
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkSchedule" }
+
+  /products/{id}/media:
+    get:
+      tags: [media]
+      summary: 상품 이미지 메타 (FR-009, 없으면 대체 이미지)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProductMedia" }
+
+components:
+  schemas:
+    OperationalSignal:
+      type: object
+      properties:
+        id: { type: integer }
+        store_id: { type: integer }
+        signal_type: { type: string, enum: [sales_drop, waste_risk, demand_surge, overstock, weather_impact] }
+        severity: { type: integer, minimum: 1, maximum: 5 }
+        product_id: { type: integer, nullable: true }
+        detected_at: { type: string, format: date-time }
+        status: { type: string, enum: [open, actioned, dismissed, expired] }
+
+    PrescriptiveAction:
+      type: object
+      properties:
+        id: { type: integer }
+        signal_id: { type: integer }
+        action_type: { type: string, enum: [price_markdown, promotion, reorder, reallocate, staffing] }
+        recommendation: { type: object }
+        expected_effect: { type: object }
+        rationale: { type: string }
+        confidence: { type: number }
+        priority: { type: integer }
+        status: { type: string, enum: [proposed, approved, executed, rejected, expired] }
+
+    ActionOutcome:
+      type: object
+      properties:
+        action_id: { type: integer }
+        baseline: { type: object }
+        actual: { type: object }
+        accuracy: { type: number }
+        hit: { type: boolean }
+        verified_at: { type: string, format: date-time }
+
+    BehaviorInsight:
+      type: object
+      properties:
+        zone_code: { type: string }
+        dwell_weight: { type: number }
+        pass_count: { type: integer }
+        pickup_count: { type: integer }
+        putback_count: { type: integer }
+        demo_segment: { type: object }
+
+    AnomalyEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        anomaly_type: { type: string, enum: [unpaid_exit, disturbance, collapse, intrusion] }
+        severity: { type: integer }
+        zone_code: { type: string, nullable: true }
+        detected_at: { type: string, format: date-time }
+        notified_at: { type: string, format: date-time, nullable: true }
+        escalated: { type: boolean }
+        false_positive: { type: boolean, nullable: true }
+
+    Device:
+      type: object
+      properties:
+        id: { type: integer }
+        device_type: { type: string, enum: [fridge, showcase, freezer, hvac] }
+        label: { type: string }
+        status: { type: string, enum: [normal, warning, critical, offline] }
+
+    DeviceHealth:
+      type: object
+      properties:
+        device: { $ref: "#/components/schemas/Device" }
+        recent_readings:
+          type: array
+          items:
+            type: object
+            properties:
+              reading_at: { type: string, format: date-time }
+              temperature: { type: number, nullable: true }
+              power_watt: { type: number, nullable: true }
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              risk_level: { type: string, enum: [info, warning, critical] }
+              predicted_failure_at: { type: string, format: date-time, nullable: true }
+              recommended_action: { type: string }
+
+    AssistantMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        role: { type: string, enum: [user, assistant] }
+        content: { type: string }
+        sources: { type: array, items: { type: object }, nullable: true }
+        linked_action_id: { type: integer, nullable: true }
+        had_grounding: { type: boolean }
+
+    WorkSchedule:
+      type: object
+      properties:
+        id: { type: integer }
+        store_id: { type: integer }
+        week_start: { type: string, format: date }
+        status: { type: string, enum: [draft, confirmed] }
+        estimated_labor_cost: { type: integer }
+        constraint_violations: { type: array, items: { type: string }, nullable: true }
+        shifts:
+          type: array
+          items:
+            type: object
+            properties:
+              employee_id: { type: integer }
+              shift_date: { type: string, format: date }
+              start_time: { type: string }
+              end_time: { type: string }
+
+    ProductMedia:
+      type: object
+      properties:
+        id: { type: integer }
+        product_id: { type: integer }
+        image_url: { type: string }
+        is_fallback: { type: boolean }
+        sort_order: { type: integer }

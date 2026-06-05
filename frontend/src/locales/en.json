@@ -4,6 +4,13 @@
     "logout": "Logout"
   },
   "nav": {
+    "dashboard": "Operations Dashboard",
+    "insights": "Prescriptive Insights",
+    "anomalies": "Anomaly Detection",
+    "assistant": "AI Assistant",
+    "analytics": "Store Behavior Analytics",
+    "devices": "Predictive Maintenance",
+    "schedule": "Workforce Scheduler",
     "orders": "Orders",
     "inventory": "Inventory",
     "transactions": "Transactions",

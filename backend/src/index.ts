@@ -22,9 +22,20 @@ import mappingsRouter from './routes/mappings';
 import consentRouter from './routes/consent';
 import docsRouter from './routes/docs';
 import metricsRouter from './routes/metrics';
+import insightsRouter from './routes/insights';
+import dashboardRouter from './routes/dashboard';
+import anomaliesRouter from './routes/anomalies';
+import assistantRouter from './routes/assistant';
+import analyticsExtRouter from './routes/analytics';
+import devicesRouter from './routes/devices';
+import schedulesRouter from './routes/schedules';
 import { problemMiddleware } from './middleware/problem';
 import { startAutoOrderScheduler } from './jobs/auto-order';
 import { startSignalPoll } from './jobs/signal-poll';
+import { startSignalDetect } from './jobs/signal-detect';
+import { startActionVerify } from './jobs/action-verify';
+import { startAnomalySim } from './jobs/anomaly-sim';
+import { startDeviceMonitor } from './jobs/device-monitor';
 import { startLocalBufferWorker, isOnline, bufferedCount } from './services/local-buffer';
 
 export function createApp(): express.Express {
@@ -75,8 +86,15 @@ export function createApp(): express.Express {
   app.use('/api/stores/:storeId/reports', reportsRouter);
   app.use('/api/stores/:storeId/vision', visionRouter);
   app.use('/api/stores/:storeId/analytics', analyticsRouter);
+  app.use('/api/stores/:storeId/analytics', analyticsExtRouter);
   app.use('/api/stores/:storeId/products', productsRouter);
   app.use('/api/stores/:storeId/product-mappings', mappingsRouter);
+  app.use('/api/stores/:storeId/insights', insightsRouter);
+  app.use('/api/stores/:storeId/dashboard', dashboardRouter);
+  app.use('/api/stores/:storeId/anomalies', anomaliesRouter);
+  app.use('/api/stores/:storeId/assistant', assistantRouter);
+  app.use('/api/stores/:storeId/devices', devicesRouter);
+  app.use('/api/stores/:storeId/schedules', schedulesRouter);
   app.use('/api/pii', consentRouter);
 
   app.use('/api', metricsRouter);
@@ -100,6 +118,10 @@ if (require.main === module) {
       startLocalBufferWorker();
       startPricingTrigger();
       startKpiAggregate();
+      startSignalDetect();
+      startActionVerify();
+      startAnomalySim();
+      startDeviceMonitor();
     }
   });
 }

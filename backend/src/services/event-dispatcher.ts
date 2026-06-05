@@ -55,6 +55,9 @@ function shortTitle(input: DispatchInput): string {
     case 'system.recovered': return '✅ 시스템 복구';
     case 'sync.flushed': return '🔄 오프라인 데이터 동기화';
     case 'pricing.applied': return '💲 동적 가격 적용';
+    case 'anomaly_notified': return '🚨 이상 징후 감지';
+    case 'anomaly_escalated': return '🚒 외부 관제 전파';
+    case 'maintenance_alert': return '🛠 장비 예지보전 경고';
     default: return `[${input.severity}] ${input.eventType}`;
   }
 }

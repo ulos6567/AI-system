@@ -11,6 +11,9 @@ import type { EslAdapter } from '../ports/esl';
 import type { LogisticsAdapter } from '../ports/logistics';
 import type { SignalAdapter } from '../ports/signal';
 import type { VisionAdapter } from '../ports/vision';
+import type { AnomalyAdapter } from '../ports/anomaly';
+import type { IotAdapter } from '../ports/iot';
+import type { LlmAdapter } from '../ports/llm';
 
 function notImplemented(label: string): never {
   throw new Error(`[adapter-factory] ${label} adapter not implemented yet`);
@@ -77,5 +80,37 @@ export function getVisionAdapter(): VisionAdapter {
       return require('./vision/mock').default as VisionAdapter;
     default:
       return notImplemented(`vision=${config.adapters.vision}`);
+  }
+}
+
+// --- 002 intelligence layer adapters ---
+
+export function getAnomalyAdapter(): AnomalyAdapter {
+  switch (config.adapters.anomaly) {
+    case 'sim':
+      return require('./anomaly/sim').default as AnomalyAdapter;
+    default:
+      return notImplemented(`anomaly=${config.adapters.anomaly}`);
+  }
+}
+
+export function getIotAdapter(): IotAdapter {
+  switch (config.adapters.iot) {
+    case 'sim':
+      return require('./iot/sim').default as IotAdapter;
+    default:
+      return notImplemented(`iot=${config.adapters.iot}`);
+  }
+}
+
+export function getLlmAdapter(): LlmAdapter {
+  switch (config.adapters.llm) {
+    case 'mock':
+      return require('./llm/mock').default as LlmAdapter;
+    case 'openai':
+    case 'real':
+      return require('./llm/http').default as LlmAdapter;
+    default:
+      return notImplemented(`llm=${config.adapters.llm}`);
   }
 }

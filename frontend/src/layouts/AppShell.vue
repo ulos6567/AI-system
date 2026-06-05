@@ -13,6 +13,13 @@ const events = useEventsStore();
 const navOpen = ref(false);
 
 const navItems = [
+  { name: 'dashboard',      label: '운영 대시보드',    icon: '📊' },
+  { name: 'insights',       label: '처방형 인사이트',   icon: '💡' },
+  { name: 'anomalies',      label: '이상 징후 감지',   icon: '🚨' },
+  { name: 'assistant',      label: 'AI 경영비서',     icon: '🤖' },
+  { name: 'analytics',      label: '매장 행동 분석',   icon: '🗺️' },
+  { name: 'devices',        label: '장비 예지보전',    icon: '🛠️' },
+  { name: 'schedule',       label: '인력 스케줄러',    icon: '🗓️' },
   { name: 'orders',         label: '발주 관리',      icon: '📦' },
   { name: 'inventory',      label: '재고 관리',      icon: '🗄️' },
   { name: 'transactions',   label: '매출 현황',      icon: '💳' },
