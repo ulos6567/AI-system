@@ -82,26 +82,26 @@ async function markAll(): Promise<void> {
   flex-direction: column;
   overflow: hidden;
 }
-.head { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; }
+.head { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid #e3e8ee; }
 .head h3 { margin: 0; font-size: 1rem; }
 .section { padding: 0.5rem 1rem; overflow-y: auto; flex: 1; min-height: 0; }
-.section h4 { margin: 0.75rem 0 0.5rem; font-size: 0.85rem; color: #475569; }
+.section h4 { margin: 0.75rem 0 0.5rem; font-size: 0.85rem; color: #3f5069; }
 .list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.list li { padding: 0.6rem 0.75rem; border-radius: 6px; background: #f8fafc; border-left: 3px solid transparent; }
-.list li.unread { background: #eff6ff; border-left-color: #0ea5e9; }
+.list li { padding: 0.6rem 0.75rem; border-radius: 6px; background: #f6f9fc; border-left: 3px solid transparent; }
+.list li.unread { background: #f5f4ff; border-left-color: #533afd; }
 .list li.sev-warn { border-left-color: #f59e0b; }
 .list li.sev-error { border-left-color: #ef4444; background: #fef2f2; }
 .list li.sev-critical { border-left-color: #b91c1c; background: #fee2e2; }
 .list .row { display: flex; gap: 0.5rem; justify-content: space-between; align-items: baseline; }
 .list .title { font-weight: 600; font-size: 0.9rem; }
-.list .sev { font-size: 0.7rem; color: #475569; }
-.list .type { font-size: 0.78rem; color: #0f172a; flex: 1; }
-.list .ts { font-size: 0.7rem; color: #94a3b8; }
-.list .body { margin: 0.3rem 0 0; font-size: 0.82rem; color: #334155; }
-.empty { color: #94a3b8; font-size: 0.85rem; padding: 0.5rem 0; }
+.list .sev { font-size: 0.7rem; color: #3f5069; }
+.list .type { font-size: 0.78rem; color: #0d253d; flex: 1; }
+.list .ts { font-size: 0.7rem; color: #8a99af; }
+.list .body { margin: 0.3rem 0 0; font-size: 0.82rem; color: #273951; }
+.empty { color: #8a99af; font-size: 0.85rem; padding: 0.5rem 0; }
 
 button { font-family: inherit; cursor: pointer; }
-button.ghost { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; padding: 0.35rem 0.6rem; border-radius: 6px; margin-left: 0.3rem; }
+button.ghost { background: #fff; color: #0d253d; border: 1px solid #c7d2e0; padding: 0.35rem 0.6rem; border-radius: 6px; margin-left: 0.3rem; }
 button.sm { font-size: 0.8rem; }
 button.xs { font-size: 0.75rem; padding: 0.2rem 0.45rem; }
 

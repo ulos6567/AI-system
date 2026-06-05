@@ -77,7 +77,7 @@ const counts = computed(() => {
   <div class="mappings-view">
     <header class="page-header">
       <div>
-        <h2>상품 코드 표준화 관리</h2>
+        <h2>상품 코드 관리</h2>
         <p class="subtitle">각 점포별로 상이한 상품 코드를 AI 기반 마스터 데이터 체계로 정제하고 표준화하는 메뉴입니다.</p>
         <p class="subtitle">점포 #{{ storeId }} · {{ mappings.length }}건</p>
       </div>
@@ -137,42 +137,42 @@ const counts = computed(() => {
 .mappings-view { display: flex; flex-direction: column; gap: 1.25rem; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 h2 { margin: 0; font-size: 1.35rem; }
-.subtitle { margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem; }
+.subtitle { margin: 0.25rem 0 0; color: #64748d; font-size: 0.9rem; }
 
 .filter-bar { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-.chip { background: #fff; color: #475569; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.85rem; cursor: pointer; }
-.chip.on { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+.chip { background: #fff; color: #3f5069; border: 1px solid #c7d2e0; border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.85rem; cursor: pointer; }
+.chip.on { background: #533afd; color: #fff; border-color: #533afd; }
 .chip .num { color: inherit; opacity: 0.7; }
 
 .card { background: #fff; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(15,23,42,0.06); overflow-x: auto; }
 .map-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 720px; }
-.map-table th, .map-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-.map-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.map-table th, .map-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #eef3f8; vertical-align: top; }
+.map-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
 .map-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* 신뢰도 열(4번째)은 헤더·값 모두 좌측 정렬 */
 .map-table th:nth-child(4),
 .map-table td:nth-child(4) { text-align: left; }
-.map-table .muted { color: #94a3b8; }
-.readonly-hint { font-size: 0.72rem; color: #a4a097; font-style: italic; }
+.map-table .muted { color: #8a99af; }
+.readonly-hint { font-size: 0.72rem; color: #8a99af; font-style: italic; }
 .map-table tr.s-pending td { background: #fffbeb; }
 .map-table tr.s-rejected td { background: #fef2f2; }
 
-code { background: #f1f5f9; padding: 0.1rem 0.4rem; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 0.85rem; }
-.cat { background: #f1f5f9; padding: 0.05rem 0.4rem; border-radius: 3px; font-size: 0.72rem; color: #475569; }
+code { background: #eef3f8; padding: 0.1rem 0.4rem; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+.cat { background: #eef3f8; padding: 0.05rem 0.4rem; border-radius: 3px; font-size: 0.72rem; color: #3f5069; }
 .badge { padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
 .badge[data-status="confirmed"] { background: #dcfce7; color: #166534; }
-.badge[data-status="auto"]      { background: #dbeafe; color: #1d4ed8; }
+.badge[data-status="auto"]      { background: #e7e6fe; color: #4434d4; }
 .badge[data-status="pending"]   { background: #fef3c7; color: #92400e; }
 .badge[data-status="rejected"]  { background: #fee2e2; color: #b91c1c; }
 
 .actions { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
 .reassign-popover { display: flex; gap: 0.25rem; margin-left: 0.5rem; }
-.reassign-popover input { width: 80px; padding: 0.2rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px; }
+.reassign-popover input { width: 80px; padding: 0.2rem 0.4rem; border: 1px solid #c7d2e0; border-radius: 4px; }
 
 button { font-family: inherit; cursor: pointer; }
-button.primary { background: #0ea5e9; color: #fff; border: none; border-radius: 4px; font-weight: 600; }
-button.ghost { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0.45rem 0.85rem; }
+button.primary { background: #533afd; color: #fff; border: none; border-radius: 4px; font-weight: 600; }
+button.ghost { background: #fff; color: #0d253d; border: 1px solid #c7d2e0; border-radius: 4px; padding: 0.45rem 0.85rem; }
 button.xs { padding: 0.2rem 0.55rem; font-size: 0.75rem; }
 
-.loading, .empty { padding: 1.5rem; text-align: center; color: #94a3b8; }
+.loading, .empty { padding: 1.5rem; text-align: center; color: #8a99af; }
 </style>

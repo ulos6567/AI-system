@@ -174,32 +174,32 @@ const avgTicket = computed(() => totalTx.value ? totalRevenue.value / totalTx.va
 <style scoped>
 .tx-view { display: flex; flex-direction: column; gap: 1.25rem; }
 .page-header h2 { margin: 0; font-size: 1.35rem; }
-.subtitle { margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem; }
+.subtitle { margin: 0.25rem 0 0; color: #64748d; font-size: 0.9rem; }
 
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 .metric { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(15,23,42,0.06); display: flex; flex-direction: column; gap: 0.25rem; }
-.metric .label { font-size: 0.78rem; color: #64748b; }
-.metric .value { font-size: 1.3rem; font-weight: 700; color: #0f172a; }
+.metric .label { font-size: 0.78rem; color: #64748d; }
+.metric .value { font-size: 1.3rem; font-weight: 700; color: #0d253d; }
 
 .card { background: #fff; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
 .card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 h3 { margin: 0; font-size: 1.05rem; }
 .filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
-.filters input, .filters select { padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; }
+.filters input, .filters select { padding: 0.3rem 0.5rem; border: 1px solid #c7d2e0; border-radius: 4px; }
 
 .chart-wrap { position: relative; height: 320px; }
 
 .tx-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.tx-table th, .tx-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
-.tx-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.tx-table th, .tx-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #eef3f8; }
+.tx-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
 .tx-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* 숫자 열(품목수·총액) 헤더를 우측 정렬된 값과 맞춤 */
 .tx-table th:nth-child(4),
 .tx-table th:nth-child(5) { text-align: right; }
-.tx-table .muted { color: #94a3b8; }
-.src { background: #ede9fe; color: #5b21b6; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
+.tx-table .muted { color: #8a99af; }
+.src { background: #ebe9fe; color: #2e2b8c; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
 
-.loading, .empty { padding: 1rem; text-align: center; color: #94a3b8; }
+.loading, .empty { padding: 1rem; text-align: center; color: #8a99af; }
 
 @media (max-width: 768px) {
   .metrics { grid-template-columns: repeat(3, 1fr); }

@@ -254,7 +254,7 @@ function quickAdd(code: string): void {
 
     <section class="card">
       <div class="card-header">
-        <h3>AI 매장 행동 분석</h3>
+        <h3>손님 행동·동선 분석</h3>
         <button class="ghost sm" @click="refreshVision">새로고침</button>
       </div>
 
@@ -297,7 +297,7 @@ function quickAdd(code: string): void {
 .kiosk-view { display: flex; flex-direction: column; gap: 1.25rem; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .page-header h2 { margin: 0; font-size: 1.35rem; }
-.subtitle { margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem; }
+.subtitle { margin: 0.25rem 0 0; color: #64748d; font-size: 0.9rem; }
 
 .grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 1rem; }
 .card { background: #fff; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
@@ -306,55 +306,55 @@ function quickAdd(code: string): void {
 .card-header h3 { margin: 0; }
 
 .scanner form { display: flex; gap: 0.5rem; }
-.bigInput { flex: 1; padding: 0.85rem 0.85rem; font-size: 1.1rem; border: 2px solid #cbd5e1; border-radius: 6px; font-family: ui-monospace, monospace; }
-.bigInput:focus { outline: none; border-color: #0ea5e9; }
-.hint { font-size: 0.78rem; color: #64748b; margin: 1rem 0 0.4rem; }
+.bigInput { flex: 1; padding: 0.85rem 0.85rem; font-size: 1.1rem; border: 2px solid #c7d2e0; border-radius: 6px; font-family: ui-monospace, monospace; }
+.bigInput:focus { outline: none; border-color: #533afd; }
+.hint { font-size: 0.78rem; color: #64748d; margin: 1rem 0 0.4rem; }
 .quick { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .quick button { font-size: 0.78rem; }
 
 .cart-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.cart-table th, .cart-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
-.cart-table th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 0.8rem; }
-.cart-table tfoot td { background: #f0f9ff; font-weight: 700; }
+.cart-table th, .cart-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #eef3f8; }
+.cart-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; font-size: 0.8rem; }
+.cart-table tfoot td { background: #f5f4ff; font-weight: 700; }
 .cart-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .cart-table .strong { font-weight: 600; }
-.cart-table .total { color: #0369a1; font-size: 1.1rem; }
-.qtyInput { width: 60px; padding: 0.25rem 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; }
+.cart-table .total { color: #2e2b8c; font-size: 1.1rem; }
+.qtyInput { width: 60px; padding: 0.25rem 0.4rem; border: 1px solid #c7d2e0; border-radius: 4px; text-align: right; }
 
 .pay { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
 .pay button { flex: 1; min-width: 140px; }
 
 .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .zones-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.zones-table th, .zones-table td { padding: 0.4rem 0.4rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
-.zones-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.zones-table th, .zones-table td { padding: 0.4rem 0.4rem; text-align: left; border-bottom: 1px solid #eef3f8; }
+.zones-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
 .zones-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* 숫자 열(이벤트·체류·픽업·세션) 헤더를 우측 정렬된 값과 맞춤 */
 .zones-table th:nth-child(n+2) { text-align: right; }
 
 .behavior-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem; }
-.behavior-list li { padding: 0.35rem 0.5rem; background: #f8fafc; border-radius: 4px; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: baseline; font-size: 0.85rem; }
-.behavior-list .ts { font-family: ui-monospace, monospace; color: #94a3b8; font-size: 0.75rem; }
-.behavior-list .type { color: #5b21b6; font-weight: 600; font-size: 0.78rem; background: #ede9fe; padding: 0.05rem 0.4rem; border-radius: 3px; }
+.behavior-list li { padding: 0.35rem 0.5rem; background: #f6f9fc; border-radius: 4px; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: baseline; font-size: 0.85rem; }
+.behavior-list .ts { font-family: ui-monospace, monospace; color: #8a99af; font-size: 0.75rem; }
+.behavior-list .type { color: #2e2b8c; font-weight: 600; font-size: 0.78rem; background: #ebe9fe; padding: 0.05rem 0.4rem; border-radius: 3px; }
 .zone { background: #dcfce7; color: #166534; padding: 0.05rem 0.4rem; border-radius: 3px; font-size: 0.78rem; }
 
 button { font-family: inherit; cursor: pointer; }
-button.primary { background: #0ea5e9; color: #fff; border: none; padding: 0.55rem 0.9rem; border-radius: 6px; font-weight: 600; }
+button.primary { background: #533afd; color: #fff; border: none; padding: 0.55rem 0.9rem; border-radius: 6px; font-weight: 600; }
 button.primary.big { padding: 0.85rem 1rem; font-size: 1rem; }
-button.primary:disabled { background: #94a3b8; cursor: not-allowed; }
-button.ghost { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; padding: 0.5rem 0.85rem; border-radius: 6px; }
+button.primary:disabled { background: #8a99af; cursor: not-allowed; }
+button.ghost { background: #fff; color: #0d253d; border: 1px solid #c7d2e0; padding: 0.5rem 0.85rem; border-radius: 6px; }
 button.ghost.on { background: #dcfce7; color: #166534; border-color: #86efac; }
 button.sm { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
 button.xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; }
 
 .error { color: #b91c1c; margin: 0.5rem 0 0; font-size: 0.85rem; }
-.empty { color: #94a3b8; padding: 1rem; text-align: center; }
+.empty { color: #8a99af; padding: 1rem; text-align: center; }
 .toast { background: #ecfdf5; color: #065f46; padding: 0.7rem 0.9rem; border-radius: 6px; margin-top: 0.75rem; font-weight: 600; font-size: 0.9rem; }
 .toast.warn { background: #fef3c7; color: #92400e; }
-.muted { color: #94a3b8; }
+.muted { color: #8a99af; }
 .readonly-hint { font-size: 0.8rem; color: #793400; font-weight: 600; align-self: center; }
 .small { font-size: 0.78rem; }
-h4 { margin: 0 0 0.5rem; font-size: 0.9rem; color: #475569; }
+h4 { margin: 0 0 0.5rem; font-size: 0.9rem; color: #3f5069; }
 
 @media (max-width: 900px) {
   .grid { grid-template-columns: 1fr; }

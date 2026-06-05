@@ -18,13 +18,13 @@ const props = withDefaults(
 );
 
 const CATEGORY_VISUAL: Record<string, { emoji: string; color: string }> = {
-  beverage: { emoji: '🥤', color: '#38bdf8' },
+  beverage: { emoji: '🥤', color: '#665efd' },
   snack: { emoji: '🍪', color: '#f59e0b' },
   lunchbox: { emoji: '🍱', color: '#ef4444' },
   ricesnack: { emoji: '🍙', color: '#10b981' },
   instant: { emoji: '🍜', color: '#f97316' },
-  frozen: { emoji: '🧊', color: '#6366f1' },
-  default: { emoji: '🛒', color: '#64748b' },
+  frozen: { emoji: '🧊', color: '#533afd' },
+  default: { emoji: '🛒', color: '#64748d' },
 };
 
 const visual = computed(() => CATEGORY_VISUAL[props.category ?? 'default'] ?? CATEGORY_VISUAL.default);
@@ -54,7 +54,7 @@ function onError(): void {
   display: inline-grid;
   place-items: center;
   overflow: hidden;
-  background: #f1f5f9;
+  background: #eef3f8;
   flex: 0 0 auto;
 }
 .product-img.rounded { border-radius: 8px; }

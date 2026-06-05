@@ -74,11 +74,11 @@ const features = [
   { icon: '📦', title: '발주 관리', desc: 'AI 수요예측 기반 자동 발주 제안과 승인·송신 관리', tint: 'peach' },
   { icon: '🗄️', title: '재고 관리', desc: '실시간 재고 현황과 입출고·유통기한 임박 추적', tint: 'mint' },
   { icon: '💳', title: '매출 현황', desc: '일·주·월 매출 추이와 객단가·거래 건수 분석', tint: 'sky' },
-  { icon: '💲', title: '실시간 가격 관리', desc: '시간대·재고 기반 동적 가격(다이나믹 프라이싱) 설정', tint: 'lavender' },
-  { icon: '📈', title: '가격 변동 이력', desc: '가격 변동 이벤트와 적용 이력 모니터링', tint: 'rose' },
-  { icon: '📊', title: '매출 및 성과 분석', desc: '핵심 지표(KPI) 대시보드와 운영 성과 리포트', tint: 'yellow' },
-  { icon: '🛒', title: 'AI 결제 시뮬레이터', desc: 'Vision AI 무인 셀프 체크아웃 흐름 시뮬레이션', tint: 'cream' },
-  { icon: '🔗', title: '상품 코드 표준화 관리', desc: '점포별 상이한 상품 코드의 표준화·정합성 관리', tint: 'mint' },
+  { icon: '💲', title: '가격 관리', desc: '시간대·재고 기반 동적 가격(다이나믹 프라이싱) 설정', tint: 'lavender' },
+  { icon: '📈', title: '가격 변경 이력', desc: '가격 변동 이벤트와 적용 이력 모니터링', tint: 'rose' },
+  { icon: '📊', title: '매출 분석', desc: '핵심 지표(KPI) 대시보드와 운영 성과 리포트', tint: 'yellow' },
+  { icon: '🛒', title: '셀프 결제 체험', desc: 'Vision AI 무인 셀프 체크아웃 흐름 시뮬레이션', tint: 'cream' },
+  { icon: '🔗', title: '상품 코드 관리', desc: '점포별 상이한 상품 코드의 표준화·정합성 관리', tint: 'mint' },
 ];
 
 // 이행 로드맵 (ISP 캔버스 · 이행 로드맵)
@@ -354,9 +354,9 @@ function goRegister(): void {
           </div>
           <div class="foot-col">
             <h4>가격 · 분석</h4>
-            <a @click="goDashboard">실시간 가격 관리</a>
-            <a @click="goDashboard">가격 변동 이력</a>
-            <a @click="goDashboard">매출 및 성과 분석</a>
+            <a @click="goDashboard">가격 관리</a>
+            <a @click="goDashboard">가격 변경 이력</a>
+            <a @click="goDashboard">매출 분석</a>
           </div>
           <div class="foot-col">
             <h4>계정</h4>
@@ -375,13 +375,13 @@ function goRegister(): void {
 <style scoped>
 /* ── Notion 디자인 토큰 ───────────────────────────── */
 .home {
-  --primary: #5645d4;
-  --primary-pressed: #4534b3;
+  --primary: #533afd;
+  --primary-pressed: #4434d4;
   --on-primary: #ffffff;
-  --brand-navy: #0a1530;
-  --brand-navy-deep: #070f24;
+  --brand-navy: #0d253d;
+  --brand-navy-deep: #091b2e;
   --brand-pink: #ff64c8;
-  --brand-purple: #7b3ff2;
+  --brand-purple: #665efd;
   --brand-teal: #2a9d99;
   --brand-green: #1aae39;
   --brand-yellow: #f5d75e;
@@ -405,9 +405,9 @@ function goRegister(): void {
   --charcoal: #37352f;
   --slate: #5d5b54;
   --steel: #787671;
-  --stone: #a4a097;
+  --stone: #8a99af;
   --on-dark: #ffffff;
-  --on-dark-muted: #a4a097;
+  --on-dark-muted: #8a99af;
 
   --shadow-card: rgba(15, 15, 15, 0.08) 0px 4px 12px 0px;
   --shadow-mockup: rgba(0, 0, 0, 0.35) 0px 24px 56px -8px;
@@ -424,33 +424,33 @@ function goRegister(): void {
 /* ── 버튼 ──────────────────────────────────────── */
 .btn {
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.3;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1;
   padding: 10px 18px;
-  border-radius: 8px;
+  border-radius: 9999px; /* Stripe 시그니처 알약 버튼 */
   border: 1px solid transparent;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
 }
-.btn.lg { padding: 13px 24px; font-size: 16px; border-radius: 8px; }
+.btn.lg { padding: 13px 24px; font-size: 16px; border-radius: 9999px; }
 .btn-primary { background: var(--primary); color: var(--on-primary); }
 .btn-primary:hover { background: var(--primary-pressed); }
 .btn-ghost { background: transparent; color: var(--ink); }
 .btn-ghost:hover { background: var(--surface); }
 .btn-secondary {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--hairline-strong);
+  background: var(--canvas);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 .btn-secondary:hover { background: var(--surface); }
 .btn-on-dark-outline {
-  background: transparent;
-  color: var(--on-dark);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: var(--canvas);
+  color: var(--primary);
+  border-color: var(--primary);
 }
-.btn-on-dark-outline:hover { background: rgba(255, 255, 255, 0.1); }
+.btn-on-dark-outline:hover { background: var(--surface); }
 
 /* ── 프로모 배너 ───────────────────────────────── */
 .promo {
@@ -517,8 +517,15 @@ function goRegister(): void {
 /* ── 히어로 ───────────────────────────────────── */
 .hero {
   position: relative;
-  background: radial-gradient(120% 120% at 50% 0%, #14224a 0%, var(--brand-navy) 55%, var(--brand-navy-deep) 100%);
-  color: var(--on-dark);
+  /* Stripe 시그니처: 크림→셔벗→라벤더→인디고→루비 파스텔 메시가 상단을 가로지르고 흰색으로 페이드 */
+  background:
+    radial-gradient(60% 90% at 8% 0%, var(--mesh-cream) 0%, transparent 60%),
+    radial-gradient(55% 80% at 32% -8%, var(--mesh-sherbet) 0%, transparent 58%),
+    radial-gradient(55% 85% at 58% -4%, var(--mesh-lavender) 0%, transparent 60%),
+    radial-gradient(50% 80% at 82% -6%, var(--mesh-magenta) 0%, transparent 55%),
+    radial-gradient(70% 95% at 102% 8%, var(--mesh-ruby) 0%, transparent 52%),
+    linear-gradient(180deg, #fdf7ee 0%, var(--canvas) 58%);
+  color: var(--ink);
   padding: 96px 24px 0;
   overflow: hidden;
 }
@@ -543,15 +550,16 @@ function goRegister(): void {
 }
 .hero-title {
   font-size: 64px;
-  font-weight: 600;
-  line-height: 1.08;
-  letter-spacing: -0.03em;
+  font-weight: 300; /* thin(300) — Stripe 디스플레이 시그니처 */
+  line-height: 1.04;
+  letter-spacing: -0.04em;
   margin: 0 0 20px;
+  color: var(--ink);
 }
 .hero-sub {
   font-size: 18px;
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--ink-mute);
   max-width: 600px;
   margin: 0 auto 32px;
 }
@@ -560,7 +568,7 @@ function goRegister(): void {
 .hero-note {
   margin: 20px 0 0;
   font-size: 13px;
-  color: var(--on-dark-muted);
+  color: var(--ink-mute);
 }
 
 /* 장식 도트 */
@@ -743,9 +751,9 @@ function goRegister(): void {
 }
 .section-head h2 {
   font-size: 40px;
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.025em;
+  font-weight: 300; /* thin 디스플레이 */
+  line-height: 1.12;
+  letter-spacing: -0.035em;
   margin: 0 0 14px;
   color: var(--ink);
 }
@@ -832,7 +840,7 @@ function goRegister(): void {
   gap: 48px;
   align-items: center;
 }
-.stat-head h2 { font-size: 36px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 14px; }
+.stat-head h2 { font-size: 36px; font-weight: 300; line-height: 1.14; letter-spacing: -0.03em; margin: 0 0 14px; }
 .stat-head p { font-size: 16px; line-height: 1.55; color: rgba(255, 255, 255, 0.72); margin: 0; }
 .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
 .stat-cell {
@@ -885,13 +893,13 @@ function goRegister(): void {
 .cta-banner {
   max-width: 1280px;
   margin: 0 auto;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
+  background: var(--canvas-cream); /* Stripe의 따뜻한 크림 인터루드 밴드 */
+  border: 1px solid #ecdcc0;
   border-radius: 20px;
   padding: 72px 32px;
   text-align: center;
 }
-.cta-banner h2 { font-size: 36px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 12px; color: var(--ink); }
+.cta-banner h2 { font-size: 36px; font-weight: 300; letter-spacing: -0.03em; margin: 0 0 12px; color: var(--ink); }
 .cta-banner p { font-size: 18px; line-height: 1.55; color: var(--slate); margin: 0 0 28px; }
 
 /* ── 푸터 ──────────────────────────────────────── */

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 002 (T034) — AI 경영비서 챗 화면 (FR-019~021, SC-010)
+ * 002 (T034) — AI 도우미 챗 화면 (FR-019~021, SC-010)
  *   자연어 질의 → 근거(sources) 동반 응답. 근거 없으면 "데이터 없음" 안내.
  */
 import { computed, nextTick, ref, watch } from 'vue';
@@ -49,7 +49,7 @@ watch(() => assistant.messages.length, async () => {
   <div class="assistant-view">
     <header class="page-header">
       <div>
-        <h2>AI 경영비서</h2>
+        <h2>AI 챗봇</h2>
         <p class="subtitle">점포 #{{ storeId }} · 운영 데이터를 근거로 답하고, 근거가 없으면 “데이터 없음”으로 안내합니다.</p>
       </div>
       <button class="ghost" @click="assistant.reset()">새 대화</button>
@@ -91,29 +91,29 @@ watch(() => assistant.messages.length, async () => {
 <style scoped>
 .assistant-view { display: flex; flex-direction: column; gap: 0.75rem; height: calc(100vh - 8rem); }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
-.subtitle { color: #6b7280; font-size: 0.9rem; margin: 0.2rem 0 0; max-width: 48rem; }
-.chat { flex: 1; overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-.welcome { margin: auto; text-align: center; color: #6b7280; }
-.welcome-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #334155; }
+.subtitle { color: #64748d; font-size: 0.9rem; margin: 0.2rem 0 0; max-width: 48rem; }
+.chat { flex: 1; overflow-y: auto; background: #fff; border: 1px solid #e3e8ee; border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.welcome { margin: auto; text-align: center; color: #64748d; }
+.welcome-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #273951; }
 .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; max-width: 32rem; }
-.sug { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 0.4rem 0.9rem; cursor: pointer; font-size: 0.85rem; }
-.sug:hover { background: #e0f2fe; }
+.sug { background: #eef3f8; border: 1px solid #e3e8ee; border-radius: 999px; padding: 0.4rem 0.9rem; cursor: pointer; font-size: 0.85rem; }
+.sug:hover { background: #ecebfe; }
 .msg { display: flex; }
 .msg.user { justify-content: flex-end; }
 .bubble { max-width: 80%; padding: 0.7rem 0.95rem; border-radius: 12px; line-height: 1.5; }
-.msg.user .bubble { background: #2563eb; color: #fff; border-bottom-right-radius: 4px; }
-.msg.assistant .bubble { background: #f1f5f9; color: #0f172a; border-bottom-left-radius: 4px; }
+.msg.user .bubble { background: #533afd; color: #fff; border-bottom-right-radius: 4px; }
+.msg.assistant .bubble { background: #eef3f8; color: #0d253d; border-bottom-left-radius: 4px; }
 .content { margin: 0; white-space: pre-wrap; }
 .sources { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
-.src-label { font-size: 0.72rem; color: #475569; font-weight: 600; }
-.src-chip { font-size: 0.72rem; background: #dbeafe; color: #1e40af; padding: 0.1rem 0.45rem; border-radius: 999px; }
+.src-label { font-size: 0.72rem; color: #3f5069; font-weight: 600; }
+.src-chip { font-size: 0.72rem; background: #e7e6fe; color: #2e2b8c; padding: 0.1rem 0.45rem; border-radius: 999px; }
 .no-ground { margin-top: 0.4rem; font-size: 0.75rem; color: #b45309; }
-.typing { color: #94a3b8; font-style: italic; }
+.typing { color: #8a99af; font-style: italic; }
 .composer { display: flex; gap: 0.5rem; }
-.composer input { flex: 1; padding: 0.65rem 0.9rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem; }
+.composer input { flex: 1; padding: 0.65rem 0.9rem; border: 1px solid #cdd7e3; border-radius: 8px; font-size: 0.95rem; }
 button { cursor: pointer; border-radius: 8px; padding: 0.5rem 1.1rem; border: 1px solid transparent; }
-button.primary { background: #2563eb; color: #fff; }
-button.primary:disabled { background: #93c5fd; cursor: not-allowed; }
-button.ghost { background: #fff; border-color: #d1d5db; }
+button.primary { background: #533afd; color: #fff; }
+button.primary:disabled { background: #b9b9f9; cursor: not-allowed; }
+button.ghost { background: #fff; border-color: #cdd7e3; }
 .error { color: #dc2626; }
 </style>

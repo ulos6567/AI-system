@@ -10,25 +10,43 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const events = useEventsStore();
-const navOpen = ref(false);
 
-const navItems = [
-  { name: 'dashboard',      label: '운영 대시보드',    icon: '📊' },
-  { name: 'insights',       label: '처방형 인사이트',   icon: '💡' },
-  { name: 'anomalies',      label: '이상 징후 감지',   icon: '🚨' },
-  { name: 'assistant',      label: 'AI 경영비서',     icon: '🤖' },
-  { name: 'analytics',      label: '매장 행동 분석',   icon: '🗺️' },
-  { name: 'devices',        label: '장비 예지보전',    icon: '🛠️' },
-  { name: 'schedule',       label: '인력 스케줄러',    icon: '🗓️' },
-  { name: 'orders',         label: '발주 관리',      icon: '📦' },
-  { name: 'inventory',      label: '재고 관리',      icon: '🗄️' },
-  { name: 'transactions',   label: '매출 현황',      icon: '💳' },
-  { name: 'pricing-rules',  label: '실시간 가격 관리',  icon: '💲' },
-  { name: 'pricing-events', label: '가격 변동 이력',  icon: '📈' },
-  { name: 'reports',        label: '매출 및 성과 분석', icon: '📊' },
-  { name: 'self-checkout',  label: 'AI 결제 시뮬레이터', icon: '🛒' },
-  { name: 'mappings',       label: '상품 코드 표준화 관리', icon: '🔗' },
+// 상단바 — 핵심 가치 중심 3개 카테고리 드롭다운 (9개 메뉴)
+const navGroups = [
+  {
+    label: '홈',
+    items: [
+      { name: 'dashboard',     label: '매장 종합 현황',   icon: '🏠' },
+      { name: 'self-checkout', label: 'AI 결제 시뮬레이터', icon: '🛒' },
+    ],
+  },
+  {
+    label: 'AI 스마트 분석',
+    items: [
+      { name: 'assistant', label: 'AI 챗봇',           icon: '🤖' },
+      { name: 'insights',  label: '매장 맞춤 개선 제안', icon: '💡' },
+      { name: 'analytics', label: '손님 행동·동선 분석', icon: '🗺️' },
+    ],
+  },
+  {
+    label: '자동화 관리',
+    items: [
+      { name: 'orders',         label: 'AI 추천 자동 발주',  icon: '📦' },
+      { name: 'pricing-rules',  label: '실시간 스마트 가격 설정', icon: '💲' },
+      { name: 'mappings',       label: '상품 코드 관리',     icon: '🔗' },
+      { name: 'local-delivery', label: '로컬 상생 배송 관리', icon: '🚚' },
+    ],
+  },
 ];
+
+// 열린 드롭다운 그룹 (없으면 null)
+const openGroup = ref<string | null>(null);
+function toggleGroup(label: string): void {
+  openGroup.value = openGroup.value === label ? null : label;
+}
+function isGroupActive(g: { items: Array<{ name: string }> }): boolean {
+  return g.items.some((i) => i.name === route.name);
+}
 
 const currentStore = computed(() => {
   const sid = auth.primaryStoreId;
@@ -62,7 +80,6 @@ onMounted(async () => {
 <template>
   <div class="shell">
     <header class="topbar">
-      <button class="hamburger" aria-label="menu" @click="navOpen = !navOpen">☰</button>
       <div class="brand">AI 점포 운영</div>
       <div class="meta">
         <span class="store">{{ currentStore }}</span>
@@ -73,35 +90,62 @@ onMounted(async () => {
           🔔
           <span v-if="events.unreadCount > 0" class="badge">{{ events.unreadCount > 99 ? '99+' : events.unreadCount }}</span>
         </button>
-        <span class="user">{{ auth.user?.displayName }}</span>
-        <span class="role" :class="{ admin: auth.isAdmin }" :title="auth.isAdmin ? '쓰기 권한 보유' : '읽기 전용 계정'">
-          {{ auth.isAdmin ? '🛡 ' + auth.roleLabel : '👁 ' + auth.roleLabel }}
-        </span>
-        <button class="logout" @click="doLogout">로그아웃</button>
+        <template v-if="auth.isAuthenticated">
+          <span class="user">{{ auth.user?.displayName }}</span>
+          <span class="role" :class="{ admin: auth.isAdmin }" :title="auth.isAdmin ? '쓰기 권한 보유' : '읽기 전용 계정'">
+            {{ auth.isAdmin ? '🛡 ' + auth.roleLabel : '👁 ' + auth.roleLabel }}
+          </span>
+          <button class="logout" @click="doLogout">로그아웃</button>
+        </template>
+        <template v-else>
+          <span class="role" title="비로그인 열람 모드">👁 게스트 · 열람 전용</span>
+          <button class="logout" @click="router.push({ name: 'login' })">로그인</button>
+        </template>
       </div>
     </header>
 
+    <!-- 상단 가로 메뉴바 — 3개 카테고리 드롭다운 -->
+    <nav class="topnav" aria-label="주 메뉴">
+      <div v-for="g in navGroups" :key="g.label" class="nav-group">
+        <button
+          class="nav-trigger"
+          :class="{ active: isGroupActive(g), open: openGroup === g.label }"
+          @click="toggleGroup(g.label)"
+        >
+          <span>{{ g.label }}</span>
+          <span class="caret">▾</span>
+        </button>
+        <div v-if="openGroup === g.label" class="nav-menu">
+          <router-link
+            v-for="item in g.items"
+            :key="item.name"
+            :to="{ name: item.name }"
+            class="nav-menu-item"
+            :class="{ active: route.name === item.name }"
+            @click="openGroup = null"
+          >
+            <span class="icon">{{ item.icon }}</span>
+            <span>{{ item.label }}</span>
+          </router-link>
+        </div>
+      </div>
+    </nav>
+    <!-- 드롭다운 바깥 클릭 시 닫기 -->
+    <div v-if="openGroup" class="nav-backdrop" @click="openGroup = null"></div>
+
     <div v-if="!auth.isAdmin && route.name !== 'self-checkout'" class="readonly-banner">
-      🔒 열람 전용 계정입니다. 발주 승인·가격 변경·매핑 수정 등 데이터 수정은 관리자(본사)만 가능합니다.
+      <template v-if="auth.isAuthenticated">
+        🔒 열람 전용 계정입니다. 발주 승인·가격 변경·매핑 수정 등 데이터 수정은 관리자(본사)만 가능합니다.
+      </template>
+      <template v-else>
+        👁 로그인 없이 둘러보는 중입니다. 데이터 조회는 자유롭게, 수정은 <a class="banner-link" @click="router.push({ name: 'login' })">로그인</a> 후 관리자만 가능합니다.
+      </template>
       <span class="banner-sub">AI 결제 시뮬레이터는 누구나 이용할 수 있어요.</span>
     </div>
 
-    <div class="body">
-      <nav class="sidenav" :class="{ open: navOpen }" @click="navOpen = false">
-        <ul>
-          <li v-for="item in navItems" :key="item.name">
-            <router-link :to="{ name: item.name }" :class="{ active: route.name === item.name }">
-              <span class="icon">{{ item.icon }}</span>
-              <span>{{ item.label }}</span>
-            </router-link>
-          </li>
-        </ul>
-      </nav>
-
-      <main class="content">
-        <router-view />
-      </main>
-    </div>
+    <main class="content" :class="{ 'bg-cool': route.name === 'dashboard' }">
+      <router-view />
+    </main>
 
     <EventPanel />
   </div>
@@ -112,14 +156,14 @@ onMounted(async () => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
-  background: #f8fafc;
-  color: #0f172a;
+  font-family: inherit;
+  background: var(--canvas-soft);
+  color: var(--ink);
 }
 .topbar {
   height: 56px;
-  background: #0f172a;
-  color: #f1f5f9;
+  background: #0d253d;
+  color: #eef3f8;
   display: flex;
   align-items: center;
   padding: 0 1rem;
@@ -129,16 +173,15 @@ onMounted(async () => {
   z-index: 10;
 }
 .brand { font-weight: 700; }
-.hamburger { background: transparent; border: none; color: #f1f5f9; font-size: 1.25rem; cursor: pointer; display: none; }
 .meta { margin-left: auto; display: flex; align-items: center; gap: 0.55rem; font-size: 0.85rem; }
-.store { background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.store { background: #1c1e54; padding: 0.2rem 0.5rem; border-radius: 4px; }
 .conn { font-size: 0.7rem; opacity: 0.6; }
 .conn.ok { opacity: 1; }
 .bell {
   position: relative;
   background: transparent;
   border: none;
-  color: #f1f5f9;
+  color: #eef3f8;
   font-size: 1.1rem;
   cursor: pointer;
   padding: 0.2rem 0.4rem;
@@ -161,54 +204,107 @@ onMounted(async () => {
   font-weight: 700;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
-  background: #334155;
-  color: #cbd5e1;
+  background: #273951;
+  color: #c7d2e0;
   white-space: nowrap;
 }
-.role.admin { background: #5645d4; color: #fff; }
-.logout { background: #38bdf8; color: #0f172a; border: none; border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; font-weight: 600; }
+.role.admin { background: var(--primary); color: #fff; }
+.logout {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+.logout:hover { background: var(--primary-press); }
 .readonly-banner {
-  background: #fef7d6;
-  color: #793400;
-  border-bottom: 1px solid #f5d75e;
+  /* 보라 톤과 어울리는 연한 라벤더 틴트(반투명) + 다크 그레이 글자로 은은하게 */
+  background: rgba(83, 58, 253, 0.07);
+  color: #3f4453;
+  border-bottom: 1px solid rgba(83, 58, 253, 0.12);
   padding: 0.55rem 1rem;
   font-size: 0.82rem;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
 }
-.banner-sub { color: #1aae39; margin-left: 0.4rem; }
-.body { display: flex; flex: 1; min-height: 0; }
-.sidenav {
-  width: 220px;
+.banner-sub { color: #64748d; margin-left: 0.4rem; }
+.banner-link { color: #533afd; text-decoration: underline; cursor: pointer; }
+
+/* 상단 메뉴바 — 3개 카테고리 드롭다운 (헤더 바로 아래 고정) */
+.topnav {
+  position: sticky;
+  top: 56px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 48px;
+  padding: 0 0.75rem;
   background: #fff;
-  border-right: 1px solid #e2e8f0;
-  padding: 1rem 0.5rem;
+  border-bottom: 1px solid var(--hairline);
 }
-.sidenav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.sidenav a {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 6px;
+.nav-group { position: relative; }
+.nav-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #273951;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.nav-trigger:hover { background: #eef3f8; }
+.nav-trigger.active { background: rgba(83, 58, 253, 0.1); color: #4434d4; font-weight: 600; }
+.nav-trigger.open { background: #eef3f8; }
+.nav-trigger .caret { font-size: 0.7rem; opacity: 0.55; }
+.nav-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 196px;
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.1);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 30;
+}
+.nav-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  color: #273951;
   text-decoration: none;
-  color: #334155;
+  font-size: 0.85rem;
 }
-.sidenav a:hover { background: #f1f5f9; }
-.sidenav a.active { background: #0ea5e9; color: #fff; }
+.nav-menu-item .icon { font-size: 0.95rem; line-height: 1; }
+.nav-menu-item:hover { background: #eef3f8; }
+.nav-menu-item.active { background: rgba(83, 58, 253, 0.1); color: #4434d4; font-weight: 600; }
+/* 바깥클릭 닫기용 — topnav(z-index:9)와 그 안의 드롭다운보다 아래에 둬서 메뉴 클릭을 막지 않게 */
+.nav-backdrop { position: fixed; inset: 0; z-index: 8; background: transparent; }
+
 .content { flex: 1; padding: 1.5rem; min-width: 0; }
+/* 대시보드 라우트 — 콘텐츠 영역을 아주 연한 쿨그레이로(카드가 떠오르도록) */
+.content.bg-cool { background: #f4f5f7; }
 
 @media (max-width: 768px) {
-  .hamburger { display: inline-flex; }
   .meta .user { display: none; }
-  .sidenav {
-    position: fixed;
-    top: 56px;
-    left: -240px;
-    height: calc(100vh - 56px);
-    transition: left 0.2s ease;
-    box-shadow: 4px 0 12px rgba(0,0,0,0.1);
-    z-index: 20;
-  }
-  .sidenav.open { left: 0; }
+  .topnav { padding: 0 0.5rem; }
   .content { padding: 1rem; }
 }
 </style>

@@ -72,7 +72,7 @@ function render(): void {
         { type: 'bar', label: '매출(현재)', data: s.map((r) => Number(r.revenue)), backgroundColor: 'rgba(14,165,233,0.7)', yAxisID: 'y' },
         { type: 'line', label: '거래수(현재)', data: s.map((r) => Number(r.transactionsCount)), borderColor: '#f97316', backgroundColor: '#f97316', yAxisID: 'y1', tension: 0.3 },
         ...(compareEnabled.value && c.length
-          ? [{ type: 'line' as const, label: '매출(비교)', data: c.map((r) => Number(r.revenue)), borderColor: '#94a3b8', borderDash: [4, 4], backgroundColor: 'transparent', yAxisID: 'y', tension: 0.3 }]
+          ? [{ type: 'line' as const, label: '매출(비교)', data: c.map((r) => Number(r.revenue)), borderColor: '#8a99af', borderDash: [4, 4], backgroundColor: 'transparent', yAxisID: 'y', tension: 0.3 }]
           : []),
       ],
     },
@@ -94,7 +94,7 @@ function render(): void {
       datasets: [
         { label: '폐기율(%) 현재', data: s.map((r) => Number(r.discardRate) * 100), borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', tension: 0.3, fill: true },
         ...(compareEnabled.value && c.length
-          ? [{ label: '폐기율(%) 비교', data: c.map((r) => Number(r.discardRate) * 100), borderColor: '#94a3b8', borderDash: [4, 4], backgroundColor: 'transparent', tension: 0.3 }]
+          ? [{ label: '폐기율(%) 비교', data: c.map((r) => Number(r.discardRate) * 100), borderColor: '#8a99af', borderDash: [4, 4], backgroundColor: 'transparent', tension: 0.3 }]
           : []),
       ],
     },
@@ -110,9 +110,9 @@ function render(): void {
     data: {
       labels,
       datasets: [
-        { label: '예측 정확도(%)', data: s.map((r, i) => r.forecastMape === null ? mapeDemo(i) : Number(r.forecastMape) * 100), borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.1)', tension: 0.3, spanGaps: true, fill: true },
+        { label: '예측 정확도(%)', data: s.map((r, i) => r.forecastMape === null ? mapeDemo(i) : Number(r.forecastMape) * 100), borderColor: '#533afd', backgroundColor: 'rgba(124,58,237,0.1)', tension: 0.3, spanGaps: true, fill: true },
         ...(compareEnabled.value && c.length
-          ? [{ label: 'MAPE 비교', data: c.map((r) => r.forecastMape === null ? null : Number(r.forecastMape) * 100), borderColor: '#94a3b8', borderDash: [4, 4], spanGaps: true, backgroundColor: 'transparent', tension: 0.3 }]
+          ? [{ label: 'MAPE 비교', data: c.map((r) => r.forecastMape === null ? null : Number(r.forecastMape) * 100), borderColor: '#8a99af', borderDash: [4, 4], spanGaps: true, backgroundColor: 'transparent', tension: 0.3 }]
           : []),
       ],
     },
@@ -141,7 +141,7 @@ function pctDelta(now: number | null | undefined, prev: number | null | undefine
   <div class="reports-view">
     <header class="page-header">
       <div>
-        <h2>매출 및 성과 분석</h2>
+        <h2>상세 매출·수익 분석</h2>
         <p class="subtitle">점포 #{{ storeId }} · {{ from }} ~ {{ to }}</p>
       </div>
       <div class="actions">
@@ -231,30 +231,30 @@ function pctDelta(now: number | null | undefined, prev: number | null | undefine
 .reports-view { display: flex; flex-direction: column; gap: 1.25rem; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .page-header h2 { margin: 0; font-size: 1.35rem; }
-.subtitle { margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem; }
+.subtitle { margin: 0.25rem 0 0; color: #64748d; font-size: 0.9rem; }
 .actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
-.actions input { padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; }
+.actions input { padding: 0.3rem 0.5rem; border: 1px solid #c7d2e0; border-radius: 4px; }
 .actions .check { gap: 0.35rem; }
 
 .compare-bar { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
-.compare-bar label { display: flex; gap: 0.35rem; align-items: center; font-size: 0.85rem; color: #475569; }
-.compare-bar input { padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; }
+.compare-bar label { display: flex; gap: 0.35rem; align-items: center; font-size: 0.85rem; color: #3f5069; }
+.compare-bar input { padding: 0.3rem 0.5rem; border: 1px solid #c7d2e0; border-radius: 4px; }
 
 .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; }
 .metric { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(15,23,42,0.06); display: flex; flex-direction: column; gap: 0.2rem; }
-.metric .label { font-size: 0.78rem; color: #64748b; }
-.metric .value { font-size: 1.3rem; font-weight: 700; color: #0f172a; }
-.metric .delta { font-size: 0.78rem; color: #475569; }
+.metric .label { font-size: 0.78rem; color: #64748d; }
+.metric .value { font-size: 1.3rem; font-weight: 700; color: #0d253d; }
+.metric .delta { font-size: 0.78rem; color: #3f5069; }
 .metric.warn .value { color: #c2410c; }
 
 .card { background: #fff; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
 .card h3 { margin: 0 0 0.75rem; font-size: 1.05rem; }
 .chart-wrap { position: relative; height: 280px; }
-.hint { color: #94a3b8; font-size: 0.78rem; margin: 0.5rem 0 0; }
+.hint { color: #8a99af; font-size: 0.78rem; margin: 0.5rem 0 0; }
 
 .kpi-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.kpi-table th, .kpi-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
-.kpi-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.kpi-table th, .kpi-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #eef3f8; }
+.kpi-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
 .kpi-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* 숫자 열(매출·거래수·객단가·폐기액·폐기율·MAPE) 헤더를 우측 정렬된 값과 맞춤 */
 .kpi-table th:nth-child(n+2) { text-align: right; }

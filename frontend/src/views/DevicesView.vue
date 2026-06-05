@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 002 (T044) — 장비 상태·예지보전 경고 화면 (FR-017~018, SC-004)
+ * 002 (T044) — 장비 상태·점검 경고 화면 (FR-017~018, SC-004)
  *   장비 카드(상태·온도·전력·경고) + 선택 시 측정 추이·경고 이력·확인.
  */
 import { computed, onMounted, ref } from 'vue';
@@ -66,7 +66,7 @@ onMounted(load);
   <div class="devices-view">
     <header class="page-header">
       <div>
-        <h2>장비 모니터링 · 예지보전</h2>
+        <h2>매장 기기 현황</h2>
         <p class="subtitle">점포 #{{ storeId }} · 온도·전력 추세로 고장을 사전 경고합니다.</p>
       </div>
       <div class="actions">
@@ -111,12 +111,12 @@ onMounted(load);
       <svg class="trend" viewBox="0 0 300 100" preserveAspectRatio="none">
         <polyline
           :points="selectedHealth.readings.map((r, i) => `${(i / Math.max(1, selectedHealth!.readings.length - 1)) * 300},${tempY(r.temperature)}`).join(' ')"
-          fill="none" stroke="#0ea5e9" stroke-width="2"
+          fill="none" stroke="#533afd" stroke-width="2"
         />
       </svg>
       <div class="trend-axis"><span>{{ minTemp }}℃</span><span>{{ maxTemp }}℃</span></div>
 
-      <h4 class="alerts-title">예지보전 경고</h4>
+      <h4 class="alerts-title">점검 경고</h4>
       <div v-if="selectedHealth.alerts.length === 0" class="empty">경고가 없습니다.</div>
       <ul v-else class="alert-list">
         <li v-for="a in selectedHealth.alerts" :key="a.id" class="alert-item" :data-risk="a.riskLevel">
@@ -140,42 +140,42 @@ onMounted(load);
 <style scoped>
 .devices-view { display: flex; flex-direction: column; gap: 1rem; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
-.subtitle { color: #6b7280; font-size: 0.9rem; margin: 0.2rem 0 0; }
+.subtitle { color: #64748d; font-size: 0.9rem; margin: 0.2rem 0 0; }
 .actions { display: flex; gap: 0.5rem; }
 .dev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; }
-.dev-card { background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid #94a3b8; border-radius: 10px; padding: 0.85rem; cursor: pointer; }
+.dev-card { background: #fff; border: 1px solid #e3e8ee; border-left: 4px solid #8a99af; border-radius: 10px; padding: 0.85rem; cursor: pointer; }
 .dev-card[data-status='warning'] { border-left-color: #f59e0b; }
 .dev-card[data-status='critical'] { border-left-color: #ef4444; background: #fef2f2; }
 .dev-card[data-status='normal'] { border-left-color: #10b981; }
-.dev-card.active { box-shadow: 0 0 0 2px #38bdf8; }
+.dev-card.active { box-shadow: 0 0 0 2px #665efd; }
 .dev-head { display: flex; align-items: center; gap: 0.5rem; }
 .dev-icon { font-size: 1.5rem; }
 .dev-label { font-weight: 700; font-size: 0.92rem; }
-.dev-type { font-size: 0.75rem; color: #6b7280; }
-.dev-status { margin-left: auto; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #e2e8f0; color: #475569; }
+.dev-type { font-size: 0.75rem; color: #64748d; }
+.dev-status { margin-left: auto; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #e3e8ee; color: #3f5069; }
 .dev-status[data-status='warning'] { background: #fef3c7; color: #92400e; }
 .dev-status[data-status='critical'] { background: #fee2e2; color: #b91c1c; }
 .dev-status[data-status='normal'] { background: #dcfce7; color: #166534; }
-.dev-metrics { display: flex; gap: 0.75rem; margin-top: 0.6rem; font-size: 0.85rem; color: #334155; flex-wrap: wrap; }
+.dev-metrics { display: flex; gap: 0.75rem; margin-top: 0.6rem; font-size: 0.85rem; color: #273951; flex-wrap: wrap; }
 .alert-badge { color: #b45309; font-weight: 700; }
-.dev-time { margin-top: 0.4rem; font-size: 0.72rem; color: #94a3b8; }
-.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; }
+.dev-time { margin-top: 0.4rem; font-size: 0.72rem; color: #8a99af; }
+.card { background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; padding: 1rem; }
 .card-header h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-.trend { width: 100%; height: 120px; background: #f8fafc; border-radius: 8px; }
-.trend-axis { display: flex; justify-content: space-between; font-size: 0.72rem; color: #94a3b8; margin-top: 0.2rem; }
+.trend { width: 100%; height: 120px; background: #f6f9fc; border-radius: 8px; }
+.trend-axis { display: flex; justify-content: space-between; font-size: 0.72rem; color: #8a99af; margin-top: 0.2rem; }
 .alerts-title { margin: 1rem 0 0.5rem; font-size: 0.9rem; }
 .alert-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-.alert-item { border: 1px solid #e5e7eb; border-left: 3px solid #f59e0b; border-radius: 8px; padding: 0.6rem; }
+.alert-item { border: 1px solid #e3e8ee; border-left: 3px solid #f59e0b; border-radius: 8px; padding: 0.6rem; }
 .alert-item[data-risk='critical'] { border-left-color: #ef4444; background: #fef2f2; }
 .alert-main { display: flex; gap: 0.5rem; align-items: center; }
 .risk-tag { font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #fef3c7; color: #92400e; }
 .risk-tag[data-risk='critical'] { background: #fee2e2; color: #b91c1c; }
 .alert-msg { font-size: 0.86rem; }
-.alert-meta { margin-top: 0.35rem; font-size: 0.76rem; color: #64748b; }
-.link { background: none; border: none; color: #2563eb; text-decoration: underline; cursor: pointer; padding: 0 0 0 0.4rem; }
+.alert-meta { margin-top: 0.35rem; font-size: 0.76rem; color: #64748d; }
+.link { background: none; border: none; color: #533afd; text-decoration: underline; cursor: pointer; padding: 0 0 0 0.4rem; }
 button { cursor: pointer; border-radius: 6px; padding: 0.4rem 0.9rem; border: 1px solid transparent; }
-button.primary { background: #2563eb; color: #fff; }
-button.ghost { background: #fff; border-color: #d1d5db; }
-.empty, .hint { color: #9ca3af; font-size: 0.9rem; }
+button.primary { background: #533afd; color: #fff; }
+button.ghost { background: #fff; border-color: #cdd7e3; }
+.empty, .hint { color: #8a99af; font-size: 0.9rem; }
 .error { color: #dc2626; }
 </style>

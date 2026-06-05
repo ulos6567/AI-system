@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 002 (T048) — 인력 스케줄러 화면 (FR-022~024, SC-011)
+ * 002 (T048) — 근무 일정 화면 (FR-022~024, SC-011)
  *   주차 선택 → 초안 생성 → 시프트 그리드·예상 인건비·제약 위반 표시 → 확정.
  */
 import { computed, onMounted, ref } from 'vue';
@@ -75,7 +75,7 @@ onMounted(() => schedules.refresh(storeId.value));
   <div class="schedule-view">
     <header class="page-header">
       <div>
-        <h2>인력 최적화 스케줄러</h2>
+        <h2>근무 일정</h2>
         <p class="subtitle">점포 #{{ storeId }} · 수요 예측 기반 시프트 초안과 예상 인건비를 제안합니다.</p>
       </div>
       <div class="actions" v-if="auth.isAdmin">
@@ -164,35 +164,35 @@ onMounted(() => schedules.refresh(storeId.value));
 <style scoped>
 .schedule-view { display: flex; flex-direction: column; gap: 1rem; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
-.subtitle { color: #6b7280; font-size: 0.9rem; margin: 0.2rem 0 0; }
+.subtitle { color: #64748d; font-size: 0.9rem; margin: 0.2rem 0 0; }
 .actions { display: flex; gap: 0.5rem; align-items: center; }
-.week-input { padding: 0.35rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; }
-.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; }
+.week-input { padding: 0.35rem 0.5rem; border: 1px solid #cdd7e3; border-radius: 6px; }
+.card { background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; padding: 1rem; }
 .card h3 { margin: 0 0 0.75rem; font-size: 1rem; }
 table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-.list th, .list td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid #f1f5f9; }
-.status { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #e2e8f0; color: #475569; }
+.list th, .list td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid #eef3f8; }
+.status { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #e3e8ee; color: #3f5069; }
 .status[data-status='confirmed'] { background: #dcfce7; color: #166534; }
 .status[data-status='draft'] { background: #fef3c7; color: #92400e; }
 .warn { color: #b91c1c; font-weight: 700; }
 .detail-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .summary { display: flex; align-items: center; gap: 0.75rem; }
-.cost { font-size: 0.9rem; color: #334155; }
-.cost strong { color: #0f172a; }
+.cost { font-size: 0.9rem; color: #273951; }
+.cost strong { color: #0d253d; }
 .violations { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0.75rem 0; color: #b91c1c; font-size: 0.84rem; }
 .violations ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
 .ok-note { color: #166534; font-size: 0.86rem; margin: 0.75rem 0; }
 .grid-wrap { overflow-x: auto; }
-.grid th, .grid td { border: 1px solid #e5e7eb; padding: 0.4rem; text-align: center; vertical-align: top; min-width: 84px; }
-.grid thead th { background: #f8fafc; font-size: 0.78rem; }
+.grid th, .grid td { border: 1px solid #e3e8ee; padding: 0.4rem; text-align: center; vertical-align: top; min-width: 84px; }
+.grid thead th { background: #f6f9fc; font-size: 0.78rem; }
 .grid .weekend { color: #dc2626; }
-.grid .rowhead { background: #f8fafc; text-align: left; font-size: 0.78rem; white-space: nowrap; }
-.grid .corner { background: #f1f5f9; }
-.chip { background: #e0f2fe; color: #075985; border-radius: 6px; padding: 0.15rem 0.4rem; margin: 0.1rem 0; font-size: 0.78rem; }
-.gap { color: #cbd5e1; }
+.grid .rowhead { background: #f6f9fc; text-align: left; font-size: 0.78rem; white-space: nowrap; }
+.grid .corner { background: #eef3f8; }
+.chip { background: #ecebfe; color: #2e2b8c; border-radius: 6px; padding: 0.15rem 0.4rem; margin: 0.1rem 0; font-size: 0.78rem; }
+.gap { color: #c7d2e0; }
 button { cursor: pointer; border-radius: 6px; padding: 0.4rem 0.9rem; border: 1px solid transparent; }
-button.primary { background: #2563eb; color: #fff; }
-button.link { background: none; border: none; color: #2563eb; text-decoration: underline; cursor: pointer; padding: 0; }
-.hint { color: #9ca3af; font-size: 0.9rem; }
+button.primary { background: #533afd; color: #fff; }
+button.link { background: none; border: none; color: #533afd; text-decoration: underline; cursor: pointer; padding: 0; }
+.hint { color: #8a99af; font-size: 0.9rem; }
 .error { color: #dc2626; }
 </style>

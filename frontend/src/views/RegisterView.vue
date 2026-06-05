@@ -84,7 +84,7 @@ function goHome(): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  background: linear-gradient(135deg, #f5f4ff, #ecebfe);
   padding: 1rem;
   font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
@@ -99,20 +99,20 @@ function goHome(): void {
   flex-direction: column;
   gap: 1rem;
 }
-h1 { font-size: 1.25rem; margin: 0; color: #0f172a; }
-.hint { color: #64748b; margin: 0 0 0.5rem; font-size: 0.9rem; }
-label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: #334155; }
+h1 { font-size: 1.25rem; margin: 0; color: #0d253d; }
+.hint { color: #64748d; margin: 0 0 0.5rem; font-size: 0.9rem; }
+label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: #273951; }
 input {
   padding: 0.65rem 0.75rem;
   font-size: 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #c7d2e0;
   border-radius: 6px;
   background: #fff;
 }
-input:focus { outline: 2px solid #38bdf8; border-color: transparent; }
+input:focus { outline: 2px solid #665efd; border-color: transparent; }
 button {
   padding: 0.75rem;
-  background: #0ea5e9;
+  background: #533afd;
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -120,24 +120,24 @@ button {
   font-weight: 600;
   cursor: pointer;
 }
-button:disabled { background: #94a3b8; cursor: not-allowed; }
+button:disabled { background: #8a99af; cursor: not-allowed; }
 button.secondary {
   background: #fff;
-  color: #0ea5e9;
-  border: 1px solid #0ea5e9;
+  color: #533afd;
+  border: 1px solid #533afd;
 }
-button.secondary:disabled { background: #fff; color: #94a3b8; border-color: #cbd5e1; cursor: not-allowed; }
+button.secondary:disabled { background: #fff; color: #8a99af; border-color: #c7d2e0; cursor: not-allowed; }
 .error { color: #b91c1c; font-size: 0.85rem; margin: 0; }
 .home-link {
   align-self: flex-start;
   background: transparent;
   border: none;
-  color: #64748b;
+  color: #64748d;
   font-size: 0.8rem;
   padding: 0;
   cursor: pointer;
   width: auto;
   font-weight: 500;
 }
-.home-link:hover { color: #0ea5e9; }
+.home-link:hover { color: #533afd; }
 </style>

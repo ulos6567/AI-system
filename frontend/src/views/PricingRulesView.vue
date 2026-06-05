@@ -152,7 +152,7 @@ function actionLabel(a: ActionType): string {
   <div class="pricing-rules-view">
     <header class="page-header">
       <div>
-        <h2>실시간 가격 관리</h2>
+        <h2>실시간 스마트 가격 설정</h2>
         <p class="subtitle">{{ pricing.rules.length }}건 · 점포 #{{ storeId }}</p>
       </div>
       <button v-if="auth.isAdmin" class="primary" @click="startNew">+ 새 룰</button>
@@ -242,40 +242,40 @@ function actionLabel(a: ActionType): string {
 .pricing-rules-view { display: flex; flex-direction: column; gap: 1.25rem; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 h2 { margin: 0; font-size: 1.35rem; }
-.subtitle { margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem; }
+.subtitle { margin: 0.25rem 0 0; color: #64748d; font-size: 0.9rem; }
 
 .card { background: #fff; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
 .card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; }
 h3 { margin: 0; font-size: 1.05rem; }
 
 .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
-.form-grid label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: #475569; }
+.form-grid label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: #3f5069; }
 .form-grid .full { grid-column: 1 / -1; }
 .form-grid input[type="text"], .form-grid input[type="number"], .form-grid select, .form-grid textarea {
-  padding: 0.45rem 0.55rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;
+  padding: 0.45rem 0.55rem; border: 1px solid #c7d2e0; border-radius: 4px; font-size: 0.9rem;
   font-family: inherit;
 }
 .form-grid textarea { font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 0.82rem; }
 .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.75rem; }
 
 .rules-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.rules-table th, .rules-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
-.rules-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.rules-table th, .rules-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #eef3f8; }
+.rules-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
 .rules-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-.rules-table .muted { color: #94a3b8; }
-.readonly-hint { font-size: 0.72rem; color: #a4a097; font-style: italic; }
+.rules-table .muted { color: #8a99af; }
+.readonly-hint { font-size: 0.72rem; color: #8a99af; font-style: italic; }
 .row-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-.badge { background: #ede9fe; color: #5b21b6; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
+.badge { background: #ebe9fe; color: #2e2b8c; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
 
 button { font-family: inherit; cursor: pointer; }
-button.primary { background: #0ea5e9; color: #fff; border: none; padding: 0.45rem 0.85rem; border-radius: 6px; font-weight: 600; }
-button.primary:disabled { background: #94a3b8; cursor: not-allowed; }
-button.ghost { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; padding: 0.45rem 0.85rem; border-radius: 6px; }
+button.primary { background: #533afd; color: #fff; border: none; padding: 0.45rem 0.85rem; border-radius: 6px; font-weight: 600; }
+button.primary:disabled { background: #8a99af; cursor: not-allowed; }
+button.ghost { background: #fff; color: #0d253d; border: 1px solid #c7d2e0; padding: 0.45rem 0.85rem; border-radius: 6px; }
 button.ghost.danger { color: #b91c1c; border-color: #fecaca; }
 button.sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
 
 .error { color: #b91c1c; font-size: 0.85rem; margin: 0.5rem 0 0; }
-.empty { padding: 1.5rem; text-align: center; color: #94a3b8; }
+.empty { padding: 1.5rem; text-align: center; color: #8a99af; }
 
 .toast { background: #ecfdf5; color: #065f46; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; }
 

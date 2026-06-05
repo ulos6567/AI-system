@@ -70,7 +70,7 @@ onMounted(load);
   <div class="insights-view">
     <header class="page-header">
       <div>
-        <h2>처방형 인사이트</h2>
+        <h2>매장 맞춤 개선 제안</h2>
         <p class="subtitle">점포 #{{ storeId }} · 신호 → 처방 → 승인 실행 → 효과 검증</p>
       </div>
       <div class="actions">
@@ -138,29 +138,29 @@ onMounted(load);
 <style scoped>
 .insights-view { padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.subtitle { color: #6b7280; font-size: 0.9rem; }
+.subtitle { color: #64748d; font-size: 0.9rem; }
 .actions { display: flex; gap: 0.5rem; }
-.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; }
+.card { background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; padding: 1rem; }
 .card-header { display: flex; justify-content: space-between; margin-bottom: 0.75rem; }
 .action-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
-.action-card { border: 1px solid #e5e7eb; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 0.85rem; }
+.action-card { border: 1px solid #e3e8ee; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 0.85rem; }
 .action-card[data-sev='high'] { border-left-color: #ef4444; }
 .action-head { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
 .badge { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 999px; }
-.badge.type { background: #eff6ff; color: #1d4ed8; }
+.badge.type { background: #f5f4ff; color: #4434d4; }
 .badge.sig { background: #fef3c7; color: #92400e; }
-.conf { margin-left: auto; font-size: 0.8rem; color: #6b7280; }
+.conf { margin-left: auto; font-size: 0.8rem; color: #64748d; }
 .rationale { margin: 0.25rem 0; }
 .expected { color: #059669; font-size: 0.85rem; font-weight: 600; }
 .action-btns { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
 button { cursor: pointer; border-radius: 6px; padding: 0.4rem 0.9rem; border: 1px solid transparent; }
-button.primary { background: #2563eb; color: #fff; }
-button.ghost { background: #fff; border-color: #d1d5db; }
-button.link { background: none; color: #2563eb; text-decoration: underline; padding: 0; }
+button.primary { background: #533afd; color: #fff; }
+button.ghost { background: #fff; border-color: #cdd7e3; }
+button.link { background: none; color: #533afd; text-decoration: underline; padding: 0; }
 .hist-table { width: 100%; border-collapse: collapse; }
-.hist-table th, .hist-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #f3f4f6; }
+.hist-table th, .hist-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eef3f8; }
 .status[data-s='executed'] { color: #059669; }
 .status[data-s='rejected'] { color: #dc2626; }
-.empty, .loading, .muted { color: #9ca3af; font-size: 0.9rem; }
+.empty, .loading, .muted { color: #8a99af; font-size: 0.9rem; }
 .error { color: #dc2626; }
 </style>

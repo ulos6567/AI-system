@@ -45,7 +45,7 @@ function rowClass(item: { quantity: number; daysToExpiry: number | null }): stri
   <div class="inventory-view">
     <header class="page-header">
       <div>
-        <h2>재고 관리</h2>
+        <h2>실시간 재고 현황</h2>
         <p class="subtitle">점포 #{{ storeId }}</p>
       </div>
     </header>
@@ -121,12 +121,12 @@ function rowClass(item: { quantity: number; daysToExpiry: number | null }): stri
 <style scoped>
 .inventory-view { display: flex; flex-direction: column; gap: 1.25rem; }
 .page-header h2 { margin: 0; font-size: 1.35rem; }
-.subtitle { margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem; }
+.subtitle { margin: 0.25rem 0 0; color: #64748d; font-size: 0.9rem; }
 
 .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
 .metric { background: #fff; padding: 1rem; border-radius: 8px; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
-.metric .label { font-size: 0.78rem; color: #64748b; }
-.metric .value { font-size: 1.4rem; font-weight: 700; color: #0f172a; }
+.metric .label { font-size: 0.78rem; color: #64748d; }
+.metric .value { font-size: 1.4rem; font-weight: 700; color: #0d253d; }
 .metric.warn { background: #fff7ed; }
 .metric.warn .value { color: #c2410c; }
 .metric.danger { background: #fef2f2; }
@@ -136,35 +136,35 @@ function rowClass(item: { quantity: number; daysToExpiry: number | null }): stri
 .card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 h3 { margin: 0; font-size: 1.05rem; }
 
-.filters { display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; color: #475569; }
+.filters { display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; color: #3f5069; }
 .filters label { display: flex; align-items: center; gap: 0.35rem; }
-.filters input[type="number"], .filters select { padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; }
+.filters input[type="number"], .filters select { padding: 0.3rem 0.5rem; border: 1px solid #c7d2e0; border-radius: 4px; }
 .check { gap: 0.4rem; }
 
 .inv-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.inv-table th, .inv-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
-.inv-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.inv-table th, .inv-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #eef3f8; }
+.inv-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
 .inv-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* 재고·잔여일 열은 헤더·값 모두 좌측 정렬 */
 .inv-table th:nth-child(5),
 .inv-table td:nth-child(5),
 .inv-table th:nth-child(7),
 .inv-table td:nth-child(7) { text-align: left; }
-.inv-table .muted { color: #94a3b8; }
+.inv-table .muted { color: #8a99af; }
 
-.cat { background: #f1f5f9; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; color: #475569; }
+.cat { background: #eef3f8; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; color: #3f5069; }
 .temp { padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
-.temp[data-zone="ambient"] { background: #f1f5f9; color: #475569; }
-.temp[data-zone="chilled"] { background: #dbeafe; color: #1d4ed8; }
-.temp[data-zone="frozen"]  { background: #e0f2fe; color: #075985; }
+.temp[data-zone="ambient"] { background: #eef3f8; color: #3f5069; }
+.temp[data-zone="chilled"] { background: #e7e6fe; color: #4434d4; }
+.temp[data-zone="frozen"]  { background: #ecebfe; color: #2e2b8c; }
 
 .row.warn td { background: #fffbeb; }
 .row.critical td { background: #fef3c7; }
 .row.zero td { background: #fee2e2; }
-.row.low td { background: #f0f9ff; }
+.row.low td { background: #f5f4ff; }
 .days-warn { color: #b45309; font-weight: 600; }
 
-.loading, .empty { padding: 1.5rem; text-align: center; color: #94a3b8; }
+.loading, .empty { padding: 1.5rem; text-align: center; color: #8a99af; }
 .error { padding: 1rem; color: #b91c1c; }
 
 @media (max-width: 768px) {

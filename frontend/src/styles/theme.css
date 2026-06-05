@@ -1,0 +1,101 @@
+/* ============================================================
+ * Stripe-inspired 전역 디자인 시스템 (DESIGN.md 기반)
+ *   - 딥 네이비 잉크 + 일렉트릭 인디고 + 쿨 오프화이트
+ *   - Söhne 대체: Inter 300/400 + OpenType ss01(스타일셋)·tnum(고정폭 숫자)
+ *   각 화면의 scoped 스타일은 CSS 변수를 통해 이 토큰을 공유한다.
+ * ============================================================ */
+:root {
+  /* 브랜드/액센트 */
+  --primary: #533afd;
+  --primary-deep: #4434d4;
+  --primary-press: #2e2b8c;
+  --primary-soft: #665efd;
+  --primary-subdued: #b9b9f9;
+  --brand-dark-900: #1c1e54;
+
+  /* 그라디언트 메시 스톱 (히어로 배경) */
+  --mesh-cream: #f5e9d4;
+  --mesh-sherbet: #ffd9a8;
+  --mesh-lavender: #d9c8ff;
+  --mesh-indigo: #533afd;
+  --mesh-ruby: #ea2261;
+  --mesh-magenta: #f96bee;
+
+  /* 잉크/텍스트 */
+  --ink: #0d253d;
+  --ink-secondary: #273951;
+  --ink-mute: #64748d;
+  --on-primary: #ffffff;
+
+  /* 서피스 */
+  --canvas: #ffffff;
+  --canvas-soft: #f6f9fc;
+  --canvas-cream: #f5e9d4;
+  --hairline: #e3e8ee;
+  --hairline-input: #a8c3de;
+
+  /* 상태(의미)색 — 대시보드 UI 한정 */
+  --ok: #1aae39;
+  --warn: #b45309;
+  --danger: #dc2626;
+
+  /* 라운드 */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 9999px;
+
+  /* 엘리베이션 */
+  --shadow-1: rgba(0, 55, 112, 0.08) 0 1px 3px;
+  --shadow-2: rgba(0, 55, 112, 0.08) 0 8px 24px, rgba(0, 55, 112, 0.04) 0 2px 6px;
+
+  font-feature-settings: 'ss01' 1, 'tnum' 1;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Inter', -apple-system, 'SF Pro Display', system-ui, 'Apple SD Gothic Neo',
+    'Segoe UI', sans-serif;
+  font-weight: 300;
+  font-feature-settings: 'ss01' 1, 'tnum' 1; /* 스타일셋 + 고정폭 숫자(Stripe의 금융 데이터 시그널) */
+  color: var(--ink);
+  background: var(--canvas-soft);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 마케팅 디스플레이 타이포 — thin(300) + 네거티브 트래킹이 브랜드 시그니처 */
+.display-thin {
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* 고정폭 숫자 유틸 — 금액/수치 셀에 명시 적용용 */
+.tnum {
+  font-feature-settings: 'tnum' 1;
+}

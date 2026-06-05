@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 002 (T029) — 이상 징후 감지·실시간 알림 화면 (FR-014~016, SC-005/006)
+ * 002 (T029) — 이상 알림·실시간 알림 화면 (FR-014~016, SC-005/006)
  *   목록 + SLA 통계 + 실시간 도착(전역 SSE 이벤트 감시) + 오탐 피드백/대응 결과.
  */
 import { computed, onMounted, watch } from 'vue';
@@ -71,7 +71,7 @@ onMounted(load);
   <div class="anomalies-view">
     <header class="page-header">
       <div>
-        <h2>이상 징후 감지</h2>
+        <h2>실시간 이상 신호 감지</h2>
         <p class="subtitle">점포 #{{ storeId }} · 실시간 감지 → 30초 내 알림 → 오탐 피드백</p>
       </div>
       <div class="actions">
@@ -141,40 +141,40 @@ onMounted(load);
 <style scoped>
 .anomalies-view { display: flex; flex-direction: column; gap: 1rem; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
-.subtitle { color: #6b7280; font-size: 0.9rem; margin: 0.2rem 0 0; }
+.subtitle { color: #64748d; font-size: 0.9rem; margin: 0.2rem 0 0; }
 .actions { display: flex; gap: 0.5rem; }
 .sla-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
-.sla-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.sla-card { background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .sla-card.ok { border-color: #86efac; background: #f0fdf4; }
-.sla-label { color: #6b7280; font-size: 0.8rem; }
-.sla-value { font-size: 1.2rem; font-weight: 700; color: #0f172a; }
-.sla-value small { font-size: 0.7rem; color: #94a3b8; font-weight: 500; }
-.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; }
+.sla-label { color: #64748d; font-size: 0.8rem; }
+.sla-value { font-size: 1.2rem; font-weight: 700; color: #0d253d; }
+.sla-value small { font-size: 0.7rem; color: #8a99af; font-weight: 500; }
+.card { background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; padding: 1rem; }
 .card-header { margin-bottom: 0.75rem; }
 .card-header h3 { margin: 0; font-size: 1rem; }
 .ev-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
-.ev-card { display: flex; gap: 0.75rem; border: 1px solid #e5e7eb; border-left: 4px solid #94a3b8; border-radius: 8px; padding: 0.75rem; }
+.ev-card { display: flex; gap: 0.75rem; border: 1px solid #e3e8ee; border-left: 4px solid #8a99af; border-radius: 8px; padding: 0.75rem; }
 .ev-card[data-sev='crit'] { border-left-color: #ef4444; background: #fef2f2; }
 .ev-card[data-sev='warn'] { border-left-color: #f59e0b; }
 .ev-icon { font-size: 1.6rem; }
 .ev-body { flex: 1; }
 .ev-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .ev-type { font-weight: 700; }
-.ev-sev { font-size: 0.72rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #e2e8f0; color: #475569; }
+.ev-sev { font-size: 0.72rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #e3e8ee; color: #3f5069; }
 .ev-sev[data-sev='crit'] { background: #fee2e2; color: #b91c1c; }
 .ev-sev[data-sev='warn'] { background: #fef3c7; color: #92400e; }
 .ev-escal { font-size: 0.72rem; color: #b91c1c; font-weight: 700; }
-.ev-meta { margin: 0.35rem 0; color: #64748b; font-size: 0.82rem; }
+.ev-meta { margin: 0.35rem 0; color: #64748d; font-size: 0.82rem; }
 .ev-btns { display: flex; gap: 0.5rem; }
 .hist-table { width: 100%; border-collapse: collapse; }
-.hist-table th, .hist-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #f3f4f6; font-size: 0.88rem; }
+.hist-table th, .hist-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eef3f8; font-size: 0.88rem; }
 .tag { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; }
 .tag.fp { background: #fee2e2; color: #b91c1c; }
 .tag.ok { background: #dcfce7; color: #166534; }
 button { cursor: pointer; border-radius: 6px; padding: 0.4rem 0.9rem; border: 1px solid transparent; }
-button.primary { background: #2563eb; color: #fff; }
-button.ghost { background: #fff; border-color: #d1d5db; }
-.empty { color: #9ca3af; font-size: 0.9rem; }
+button.primary { background: #533afd; color: #fff; }
+button.ghost { background: #fff; border-color: #cdd7e3; }
+.empty { color: #8a99af; font-size: 0.9rem; }
 .error { color: #dc2626; }
 @media (max-width: 768px) { .sla-row { grid-template-columns: 1fr; } }
 </style>

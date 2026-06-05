@@ -5,31 +5,31 @@ import { setUnauthorizedHandler } from '@/api/client';
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    // 공개 메인 페이지 — 비로그인 방문자도 열람 가능 (첫 화면)
-    { path: '/', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { public: true } },
+    // 첫 화면 — 비로그인 방문자도 곧장 운영 대시보드(실데이터)로 진입
+    { path: '/', redirect: { name: 'dashboard' } },
+    // 기존 마케팅 소개 페이지는 /home 에서 계속 열람 가능
+    { path: '/home', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { public: true } },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
     { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { public: true } },
     {
-      // 인증이 필요한 앱 영역 (/app/*)
+      // 앱 영역 (/app/*) — 비로그인 방문자도 읽기 전용으로 열람 가능
       path: '/app',
       component: () => import('@/layouts/AppShell.vue'),
       children: [
         { path: '', redirect: { name: 'dashboard' } },
-        { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
-        { path: 'insights', name: 'insights', component: () => import('@/views/InsightsView.vue') },
-        { path: 'anomalies', name: 'anomalies', component: () => import('@/views/AnomaliesView.vue') },
-        { path: 'assistant', name: 'assistant', component: () => import('@/views/AssistantView.vue') },
-        { path: 'analytics', name: 'analytics', component: () => import('@/views/AnalyticsView.vue') },
-        { path: 'devices', name: 'devices', component: () => import('@/views/DevicesView.vue') },
-        { path: 'schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue') },
-        { path: 'orders', name: 'orders', component: () => import('@/views/OrdersView.vue') },
-        { path: 'inventory', name: 'inventory', component: () => import('@/views/InventoryView.vue') },
-        { path: 'transactions', name: 'transactions', component: () => import('@/views/TransactionsView.vue') },
-        { path: 'pricing/rules', name: 'pricing-rules', component: () => import('@/views/PricingRulesView.vue') },
-        { path: 'pricing/events', name: 'pricing-events', component: () => import('@/views/PricingEventsView.vue') },
-        { path: 'reports', name: 'reports', component: () => import('@/views/ReportsView.vue') },
-        { path: 'self-checkout', name: 'self-checkout', component: () => import('@/views/SelfCheckoutMockView.vue') },
-        { path: 'mappings', name: 'mappings', component: () => import('@/views/ProductMappingsView.vue') },
+        { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '매장 종합 현황' } },
+        { path: 'insights', name: 'insights', component: () => import('@/views/InsightsView.vue'), meta: { title: '매장 맞춤 개선 제안' } },
+        { path: 'assistant', name: 'assistant', component: () => import('@/views/AssistantView.vue'), meta: { title: 'AI 챗봇' } },
+        { path: 'analytics', name: 'analytics', component: () => import('@/views/AnalyticsView.vue'), meta: { title: '손님 행동·동선 분석' } },
+        { path: 'orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { title: 'AI 추천 자동 발주' } },
+        { path: 'pricing/rules', name: 'pricing-rules', component: () => import('@/views/PricingRulesView.vue'), meta: { title: '실시간 스마트 가격 설정' } },
+        { path: 'self-checkout', name: 'self-checkout', component: () => import('@/views/SelfCheckoutMockView.vue'), meta: { title: 'AI 결제 시뮬레이터' } },
+        { path: 'mappings', name: 'mappings', component: () => import('@/views/ProductMappingsView.vue'), meta: { title: '상품 코드 관리' } },
+        { path: 'local-delivery', name: 'local-delivery', component: () => import('@/views/ComingSoonView.vue'), meta: { title: '로컬 상생 배송 관리' } },
+        // 메뉴에서는 빠졌지만 URL 접근은 유지(기능 보존): 매출 현황·가격 변경 이력·근무 일정
+        { path: 'transactions', name: 'transactions', component: () => import('@/views/TransactionsView.vue'), meta: { title: '매출 현황' } },
+        { path: 'pricing/events', name: 'pricing-events', component: () => import('@/views/PricingEventsView.vue'), meta: { title: '가격 변경 이력' } },
+        { path: 'schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue'), meta: { title: '근무 일정' } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -40,11 +40,18 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore();
   if (!auth.user) await auth.fetchMe();
   if (to.meta?.public) {
-    if (auth.isAuthenticated && to.name === 'login') return { name: 'orders' };
+    if (auth.isAuthenticated && to.name === 'login') return { name: 'dashboard' };
     return true;
   }
-  if (!auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } };
+  // /app/* 은 비로그인 방문자(게스트)도 읽기 전용으로 열람 가능 — 로그인 강제하지 않음
   return true;
+});
+
+// 브라우저 탭 제목 — 메뉴 명칭과 일치하도록 라우트 meta.title 반영
+const BASE_TITLE = 'AI 점포 운영 시스템';
+router.afterEach((to) => {
+  const t = to.meta?.title as string | undefined;
+  document.title = t ? `${t} · ${BASE_TITLE}` : BASE_TITLE;
 });
 
 // 401 발생 시 강제 로그아웃 + /login 이동
