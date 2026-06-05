@@ -74,11 +74,11 @@ const features = [
   { icon: '📦', title: '발주 관리', desc: 'AI 수요예측 기반 자동 발주 제안과 승인·송신 관리', tint: 'peach' },
   { icon: '🗄️', title: '재고 관리', desc: '실시간 재고 현황과 입출고·유통기한 임박 추적', tint: 'mint' },
   { icon: '💳', title: '매출 현황', desc: '일·주·월 매출 추이와 객단가·거래 건수 분석', tint: 'sky' },
-  { icon: '💲', title: '가격 정책', desc: '시간대·재고 기반 동적 가격(다이나믹 프라이싱) 설정', tint: 'lavender' },
+  { icon: '💲', title: '실시간 가격 관리', desc: '시간대·재고 기반 동적 가격(다이나믹 프라이싱) 설정', tint: 'lavender' },
   { icon: '📈', title: '가격 변동 이력', desc: '가격 변동 이벤트와 적용 이력 모니터링', tint: 'rose' },
-  { icon: '📊', title: '경영 리포트', desc: '핵심 지표(KPI) 대시보드와 운영 성과 리포트', tint: 'yellow' },
-  { icon: '🛒', title: '셀프 계산대', desc: 'Vision AI 무인 셀프 체크아웃 흐름 시뮬레이션', tint: 'cream' },
-  { icon: '🔗', title: '상품 매핑', desc: '점포별 상이한 상품 코드의 표준화·정합성 관리', tint: 'mint' },
+  { icon: '📊', title: '매출 및 성과 분석', desc: '핵심 지표(KPI) 대시보드와 운영 성과 리포트', tint: 'yellow' },
+  { icon: '🛒', title: 'AI 결제 시뮬레이터', desc: 'Vision AI 무인 셀프 체크아웃 흐름 시뮬레이션', tint: 'cream' },
+  { icon: '🔗', title: '상품 코드 표준화 관리', desc: '점포별 상이한 상품 코드의 표준화·정합성 관리', tint: 'mint' },
 ];
 
 // 이행 로드맵 (ISP 캔버스 · 이행 로드맵)
@@ -129,11 +129,6 @@ function goRegister(): void {
 
 <template>
   <div class="home">
-    <!-- 상단 프로모 배너 -->
-    <div class="promo">
-      <span>🚀 데이터와 AI로 만드는 차세대 소매점포 표준 — 로그인 없이 둘러보기 가능</span>
-    </div>
-
     <!-- 상단 내비게이션 -->
     <header class="nav">
       <div class="nav-inner">
@@ -359,9 +354,9 @@ function goRegister(): void {
           </div>
           <div class="foot-col">
             <h4>가격 · 분석</h4>
-            <a @click="goDashboard">가격 정책</a>
+            <a @click="goDashboard">실시간 가격 관리</a>
             <a @click="goDashboard">가격 변동 이력</a>
-            <a @click="goDashboard">경영 리포트</a>
+            <a @click="goDashboard">매출 및 성과 분석</a>
           </div>
           <div class="foot-col">
             <h4>계정</h4>

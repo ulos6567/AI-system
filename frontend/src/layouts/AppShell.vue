@@ -16,11 +16,11 @@ const navItems = [
   { name: 'orders',         label: '발주 관리',      icon: '📦' },
   { name: 'inventory',      label: '재고 관리',      icon: '🗄️' },
   { name: 'transactions',   label: '매출 현황',      icon: '💳' },
-  { name: 'pricing-rules',  label: '가격 정책',      icon: '💲' },
+  { name: 'pricing-rules',  label: '실시간 가격 관리',  icon: '💲' },
   { name: 'pricing-events', label: '가격 변동 이력',  icon: '📈' },
-  { name: 'reports',        label: '경영 리포트',    icon: '📊' },
-  { name: 'self-checkout',  label: '셀프 계산대',    icon: '🛒' },
-  { name: 'mappings',       label: '상품 매핑',      icon: '🔗' },
+  { name: 'reports',        label: '매출 및 성과 분석', icon: '📊' },
+  { name: 'self-checkout',  label: 'AI 결제 시뮬레이터', icon: '🛒' },
+  { name: 'mappings',       label: '상품 코드 표준화 관리', icon: '🔗' },
 ];
 
 const currentStore = computed(() => {
@@ -76,7 +76,7 @@ onMounted(async () => {
 
     <div v-if="!auth.isAdmin && route.name !== 'self-checkout'" class="readonly-banner">
       🔒 열람 전용 계정입니다. 발주 승인·가격 변경·매핑 수정 등 데이터 수정은 관리자(본사)만 가능합니다.
-      <span class="banner-sub">셀프 계산대 결제는 누구나 이용할 수 있어요.</span>
+      <span class="banner-sub">AI 결제 시뮬레이터는 누구나 이용할 수 있어요.</span>
     </div>
 
     <div class="body">

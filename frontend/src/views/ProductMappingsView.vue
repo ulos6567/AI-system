@@ -19,7 +19,8 @@ interface MappingRow {
 const auth = useAuthStore();
 const storeId = computed(() => auth.primaryStoreId ?? 1);
 
-const filter = ref<'all' | 'pending' | 'auto' | 'confirmed' | 'rejected'>('pending');
+// 기본값을 'all'로: 검토 대기(pending)가 없을 때도 확정(confirmed) 매핑 현황이 바로 보이도록 한다.
+const filter = ref<'all' | 'pending' | 'auto' | 'confirmed' | 'rejected'>('all');
 const mappings = ref<MappingRow[]>([]);
 const loading = ref(false);
 const reassignId = ref<number | null>(null);
@@ -76,7 +77,8 @@ const counts = computed(() => {
   <div class="mappings-view">
     <header class="page-header">
       <div>
-        <h2>상품 매핑</h2>
+        <h2>상품 코드 표준화 관리</h2>
+        <p class="subtitle">각 점포별로 상이한 상품 코드를 AI 기반 마스터 데이터 체계로 정제하고 표준화하는 메뉴입니다.</p>
         <p class="subtitle">점포 #{{ storeId }} · {{ mappings.length }}건</p>
       </div>
       <button v-if="auth.isAdmin" class="ghost" @click="rerun">미해소 재매핑 시도</button>
@@ -112,8 +114,8 @@ const counts = computed(() => {
             <td class="actions">
               <template v-if="auth.isAdmin">
                 <button v-if="m.status !== 'confirmed' && m.productMasterId" class="primary xs" @click="patch(m.id, { action: 'confirm' })">확정</button>
-                <button v-if="m.status !== 'rejected'" class="ghost xs" @click="patch(m.id, { action: 'reject' })">거부</button>
-                <button class="ghost xs" @click="reassignId = m.id">재할당</button>
+                <button v-if="m.status !== 'rejected'" class="ghost xs" @click="patch(m.id, { action: 'reject' })">제외</button>
+                <button class="ghost xs" @click="reassignId = m.id">연결 변경</button>
               </template>
               <span v-else class="readonly-hint">열람 전용</span>
 
@@ -147,6 +149,9 @@ h2 { margin: 0; font-size: 1.35rem; }
 .map-table th, .map-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
 .map-table th { background: #f8fafc; color: #475569; font-weight: 600; }
 .map-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* 신뢰도 열(4번째)은 헤더·값 모두 좌측 정렬 */
+.map-table th:nth-child(4),
+.map-table td:nth-child(4) { text-align: left; }
 .map-table .muted { color: #94a3b8; }
 .readonly-hint { font-size: 0.72rem; color: #a4a097; font-style: italic; }
 .map-table tr.s-pending td { background: #fffbeb; }

@@ -7,11 +7,11 @@
     "orders": "발주",
     "inventory": "재고",
     "transactions": "거래/매출",
-    "pricingRules": "가격 룰",
+    "pricingRules": "실시간 가격 관리",
     "pricingEvents": "가격 이력",
-    "reports": "리포트",
-    "selfCheckout": "셀프 결제",
-    "mappings": "매핑 검토"
+    "reports": "매출 및 성과 분석",
+    "selfCheckout": "AI 결제 시뮬레이터",
+    "mappings": "상품 코드 표준화 관리"
   },
   "auth": {
     "loginTitle": "로그인",

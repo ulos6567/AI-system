@@ -152,7 +152,7 @@ function actionLabel(a: ActionType): string {
   <div class="pricing-rules-view">
     <header class="page-header">
       <div>
-        <h2>가격 정책</h2>
+        <h2>실시간 가격 관리</h2>
         <p class="subtitle">{{ pricing.rules.length }}건 · 점포 #{{ storeId }}</p>
       </div>
       <button v-if="auth.isAdmin" class="primary" @click="startNew">+ 새 룰</button>

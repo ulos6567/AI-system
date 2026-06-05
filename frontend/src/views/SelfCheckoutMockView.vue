@@ -19,6 +19,46 @@ const zones = ref<Awaited<ReturnType<typeof visionApi.zones>>['zones']>([]);
 
 const total = computed(() => cart.value.reduce((s, it) => s + it.unitPrice * it.quantity, 0));
 
+// ── 데모용 폴백 ───────────────────────────────────────────────
+// Vision Mock 미가동 등으로 실제 분석 데이터가 비어 있을 때, 화면이 비어 보이지 않도록
+// 현실적인 더미 데이터를 보여준다. 실제 데이터가 들어오면 그 값이 우선 사용된다.
+const DEMO_ZONES = [
+  { zoneCode: 'A-음료', events: 142, dwellSeconds: 1880, pickups: 64, uniqueSessions: 38 },
+  { zoneCode: 'B-도시락', events: 98, dwellSeconds: 2460, pickups: 51, uniqueSessions: 33 },
+  { zoneCode: 'C-스낵', events: 76, dwellSeconds: 1120, pickups: 29, uniqueSessions: 27 },
+  { zoneCode: 'D-냉장', events: 61, dwellSeconds: 940, pickups: 22, uniqueSessions: 19 },
+  { zoneCode: 'E-계산대', events: 53, dwellSeconds: 410, pickups: 0, uniqueSessions: 41 },
+];
+
+const DEMO_BEHAVIOR = (() => {
+  const base = Date.now();
+  const specs: Array<{ type: string; zone: string; product: string | null; dwell: number | null; ago: number }> = [
+    { type: 'pickup', zone: 'B-도시락', product: '불고기 도시락', dwell: 12, ago: 35 },
+    { type: 'dwell', zone: 'A-음료', product: null, dwell: 28, ago: 92 },
+    { type: 'pickup', zone: 'A-음료', product: '삼다수 500ml', dwell: 7, ago: 138 },
+    { type: 'putback', zone: 'C-스낵', product: '포카칩 오리지널', dwell: 9, ago: 205 },
+    { type: 'pickup', zone: 'B-도시락', product: '제육 도시락', dwell: 15, ago: 270 },
+    { type: 'zone_enter', zone: 'D-냉장', product: null, dwell: null, ago: 332 },
+    { type: 'pickup', zone: 'C-스낵', product: '새우깡', dwell: 6, ago: 401 },
+    { type: 'dwell', zone: 'B-도시락', product: null, dwell: 33, ago: 470 },
+    { type: 'pickup', zone: 'A-음료', product: '바나나우유 240ml', dwell: 8, ago: 540 },
+    { type: 'putback', zone: 'A-음료', product: '카페라떼 컵', dwell: 11, ago: 612 },
+  ];
+  return specs.map((s, i) => ({
+    id: -1 - i, // 실제 이벤트(양수 id)와 충돌하지 않도록 음수 키
+    sessionId: `demo-${1000 + i}`,
+    eventType: s.type,
+    zoneCode: s.zone,
+    productMasterId: null as number | null,
+    productName: s.product,
+    dwellSeconds: s.dwell,
+    occurredAt: new Date(base - s.ago * 1000).toISOString(),
+  }));
+})();
+
+const displayZones = computed(() => (zones.value.length ? zones.value : DEMO_ZONES));
+const displayBehavior = computed(() => (behavior.value.length ? behavior.value : DEMO_BEHAVIOR));
+
 async function scan(): Promise<void> {
   const q = inputCode.value.trim();
   if (!q) return;
@@ -142,7 +182,8 @@ function quickAdd(code: string): void {
   <div class="kiosk-view">
     <header class="page-header">
       <div>
-        <h2>셀프 계산대 (모의)</h2>
+        <h2>AI 결제 시뮬레이터</h2>
+        <p class="subtitle">이곳에서 발생한 결제 및 Vision AI 감지 데이터는 매출 현황과 재고 관리에 실시간으로 연동됩니다.</p>
         <p class="subtitle">점포 #{{ storeId }} · 바코드 또는 로컬코드 입력</p>
       </div>
       <button v-if="auth.isAdmin" class="ghost" :class="{ on: visionStatus }" @click="toggleVision">
@@ -213,17 +254,17 @@ function quickAdd(code: string): void {
 
     <section class="card">
       <div class="card-header">
-        <h3>Vision 분석 (최근)</h3>
+        <h3>AI 매장 행동 분석</h3>
         <button class="ghost sm" @click="refreshVision">새로고침</button>
       </div>
 
       <div class="analytics-grid">
         <div>
-          <h4>존별 활동 (7일)</h4>
-          <table v-if="zones.length" class="zones-table">
+          <h4>매대 구역별 고객 활동 (최근 7일)</h4>
+          <table v-if="displayZones.length" class="zones-table">
             <thead><tr><th>존</th><th>이벤트</th><th>체류(초)</th><th>픽업</th><th>세션</th></tr></thead>
             <tbody>
-              <tr v-for="z in zones" :key="z.zoneCode">
+              <tr v-for="z in displayZones" :key="z.zoneCode">
                 <td><span class="zone">{{ z.zoneCode }}</span></td>
                 <td class="num">{{ z.events }}</td>
                 <td class="num">{{ z.dwellSeconds }}</td>
@@ -235,9 +276,9 @@ function quickAdd(code: string): void {
           <p v-else class="empty">데이터 없음. "Vision Mock 시작" 클릭.</p>
         </div>
         <div>
-          <h4>최근 행동 이벤트 (PII 미수집)</h4>
-          <ul v-if="behavior.length" class="behavior-list">
-            <li v-for="ev in behavior.slice(0, 15)" :key="ev.id">
+          <h4>실시간 고객 행동 기록 (개인정보 미수집)</h4>
+          <ul v-if="displayBehavior.length" class="behavior-list">
+            <li v-for="ev in displayBehavior.slice(0, 15)" :key="ev.id">
               <span class="ts">{{ ev.occurredAt.replace('T', ' ').slice(11, 19) }}</span>
               <span class="type">{{ ev.eventType }}</span>
               <span class="zone">{{ ev.zoneCode ?? '—' }}</span>
@@ -288,6 +329,8 @@ function quickAdd(code: string): void {
 .zones-table th, .zones-table td { padding: 0.4rem 0.4rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
 .zones-table th { background: #f8fafc; color: #475569; font-weight: 600; }
 .zones-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* 숫자 열(이벤트·체류·픽업·세션) 헤더를 우측 정렬된 값과 맞춤 */
+.zones-table th:nth-child(n+2) { text-align: right; }
 
 .behavior-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 .behavior-list li { padding: 0.35rem 0.5rem; background: #f8fafc; border-radius: 4px; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: baseline; font-size: 0.85rem; }

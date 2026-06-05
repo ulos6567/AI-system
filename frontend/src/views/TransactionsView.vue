@@ -47,13 +47,20 @@ async function load(): Promise<void> {
   }
 }
 
+// ISO 날짜 문자열(예: 2026-05-05T00:00:00.000Z)을 MM-DD(예: 05-05)로 변환.
+// UTC 자정 버킷이므로 문자열에서 직접 추출해 타임존 변환에 따른 날짜 밀림을 방지한다.
+function formatBucket(bucket: string): string {
+  const m = /^\d{4}-(\d{2}-\d{2})/.exec(bucket);
+  return m ? m[1] : bucket;
+}
+
 function renderChart(): void {
   if (!chartCanvas.value) return;
   chart?.destroy();
   chart = new Chart(chartCanvas.value, {
     type: 'bar',
     data: {
-      labels: series.value.map((p) => p.bucket),
+      labels: series.value.map((p) => formatBucket(p.bucket)),
       datasets: [
         {
           type: 'bar',
@@ -186,6 +193,9 @@ h3 { margin: 0; font-size: 1.05rem; }
 .tx-table th, .tx-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
 .tx-table th { background: #f8fafc; color: #475569; font-weight: 600; }
 .tx-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* 숫자 열(품목수·총액) 헤더를 우측 정렬된 값과 맞춤 */
+.tx-table th:nth-child(4),
+.tx-table th:nth-child(5) { text-align: right; }
 .tx-table .muted { color: #94a3b8; }
 .src { background: #ede9fe; color: #5b21b6; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
 

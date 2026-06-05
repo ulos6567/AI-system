@@ -35,3 +35,4 @@ logs/
 # Offline buffer (T045)
 .local-buffer.jsonl
 backend/.local-buffer.jsonl
+.run/*.pid

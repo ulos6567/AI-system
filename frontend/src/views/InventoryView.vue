@@ -145,6 +145,11 @@ h3 { margin: 0; font-size: 1.05rem; }
 .inv-table th, .inv-table td { padding: 0.55rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
 .inv-table th { background: #f8fafc; color: #475569; font-weight: 600; }
 .inv-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* 재고·잔여일 열은 헤더·값 모두 좌측 정렬 */
+.inv-table th:nth-child(5),
+.inv-table td:nth-child(5),
+.inv-table th:nth-child(7),
+.inv-table td:nth-child(7) { text-align: left; }
 .inv-table .muted { color: #94a3b8; }
 
 .cat { background: #f1f5f9; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; color: #475569; }

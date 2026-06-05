@@ -9,6 +9,7 @@
     "db:migrate": "ts-node --transpile-only src/db/migrate.ts",
     "db:seed": "ts-node --transpile-only src/db/seed.ts",
     "db:seed:demo": "ts-node --transpile-only src/db/seed-demo-refresh.ts",
+    "db:seed:pricing-demo": "ts-node --transpile-only src/db/seed-pricing-mapping-demo.ts",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format": "prettier -w \"src/**/*.ts\" \"tests/**/*.ts\"",
     "test": "jest"

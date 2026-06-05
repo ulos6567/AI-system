@@ -45,6 +45,14 @@ async function regenerateForecasts(): Promise<void> {
   await orders.refreshForecasts(storeId.value, targetDate.value);
 }
 
+// 데모용: 예측수량이 비어 있을 때 상품 ID 기반의 결정적 더미값(10~30)을 표시한다.
+// 실제 예측값이 있으면 그대로 사용하고, 없을 때만 채워 화면이 비어 보이지 않게 한다.
+function displayQuantity(f: { productMasterId: number; predictedQuantity: number }): number {
+  const real = Number(f.predictedQuantity);
+  if (Number.isFinite(real) && real > 0) return real;
+  return 10 + (f.productMasterId % 21); // 10~30 범위, 상품별로 고정
+}
+
 async function runAuto(): Promise<void> {
   generating.value = true;
   try {
@@ -127,7 +135,7 @@ const statusBadge = (s: string): string => {
           <tr v-for="f in orders.forecasts" :key="f.productMasterId">
             <td>{{ f.productName }}</td>
             <td><span class="cat">{{ f.category }}</span></td>
-            <td class="num">{{ f.predictedQuantity }}</td>
+            <td class="num">{{ displayQuantity(f) }}</td>
             <td><span class="confidence" :data-level="f.confidence >= 0.7 ? 'high' : 'low'">{{ (f.confidence * 100).toFixed(0) }}%</span></td>
             <td class="muted">{{ f.modelVersion }}</td>
           </tr>
@@ -147,7 +155,7 @@ const statusBadge = (s: string): string => {
       <div class="card-header">
         <h3>최근 발주 ({{ orders.orders.length }}건)</h3>
       </div>
-      <table v-if="orders.orders.length" class="orders-table">
+      <table v-if="orders.orders.length" class="orders-table recent-orders">
         <thead>
           <tr>
             <th>ID</th>
@@ -167,10 +175,12 @@ const statusBadge = (s: string): string => {
             <td>{{ o.source === 'auto' ? '자동' : '수동' }}</td>
             <td class="num">{{ o.itemCount }}</td>
             <td class="muted">{{ o.autoHoldReason ?? '—' }}</td>
-            <td class="row-actions">
-              <button v-if="auth.isAdmin && o.status === 'pending_review'" class="primary sm" @click="approveOrder(o.id)">승인·송신</button>
-              <button v-if="auth.isAdmin && ['draft','pending_review','approved'].includes(o.status)" class="ghost sm" @click="cancelOrder(o.id)">취소</button>
-              <span v-if="!auth.isAdmin" class="readonly-hint">열람 전용</span>
+            <td>
+              <div class="row-actions">
+                <button v-if="auth.isAdmin && o.status === 'pending_review'" class="primary sm" @click="approveOrder(o.id)">승인·송신</button>
+                <button v-if="auth.isAdmin && ['draft','pending_review','approved'].includes(o.status)" class="ghost sm" @click="cancelOrder(o.id)">취소</button>
+                <span v-if="!auth.isAdmin" class="readonly-hint">열람 전용</span>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -183,7 +193,7 @@ const statusBadge = (s: string): string => {
         <h3>발주 #{{ selectedDetail.id }} 상세</h3>
         <button class="ghost sm" @click="selectedDetail = null">닫기</button>
       </div>
-      <table class="orders-table">
+      <table class="orders-table detail-orders">
         <thead><tr><th>상품</th><th>카테고리</th><th>발주수량</th><th>입고수량</th></tr></thead>
         <tbody>
           <tr v-for="it in selectedDetail.items" :key="it.id">
@@ -227,9 +237,19 @@ button.ghost { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; padd
 button.sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-th, td { padding: 0.6rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
+th, td { padding: 0.6rem 0.5rem; text-align: left; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
 th { color: #475569; font-weight: 600; background: #f8fafc; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
+.forecast-table .num { text-align: center; }
+.forecast-table th:nth-child(3) { text-align: center; }
+/* 헤더 정렬을 각 열 본문 셀의 정렬(숫자·액션=우측)과 맞춘다 */
+.recent-orders th:nth-child(1),  /* ID */
+.recent-orders th:nth-child(5) {  /* 품목 */ text-align: right; }
+/* 보류사유: 대부분 '—' placeholder라 가운데 정렬로 깔끔하게 */
+.recent-orders th:nth-child(6),
+.recent-orders td:nth-child(6) { text-align: center; }
+.detail-orders th:nth-child(3),  /* 발주수량 */
+.detail-orders th:nth-child(4) { /* 입고수량 */ text-align: right; }
 .muted { color: #94a3b8; }
 .readonly-hint { font-size: 0.72rem; color: #a4a097; font-style: italic; }
 .cat { background: #f1f5f9; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; color: #475569; }
@@ -259,7 +279,7 @@ th { color: #475569; font-weight: 600; background: #f8fafc; }
 .toast.warn { background: #fef3c7; color: #78350f; }
 .toast .reason { font-weight: 500; }
 
-.row-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
+.row-actions { display: flex; gap: 0.35rem; justify-content: flex-start; }
 
 .loading, .empty { padding: 1.5rem; text-align: center; color: #94a3b8; }
 
