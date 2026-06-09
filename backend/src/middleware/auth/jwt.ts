@@ -69,3 +69,19 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
   res.status(401).json({ error: 'missing_bearer' });
 }
+
+/**
+ * 읽기 전용 동작이지만 POST 로 전달되는 라우트(예: AI 비서 질의)를 위한 가드.
+ *   세션/JWT 가 있으면 그 신원을, 없으면 메서드와 무관하게 게스트로 허용한다.
+ *   운영 데이터를 변경하지 않는 라우트에만 사용할 것(쓰기 라우트엔 requireAuth+requireAdmin).
+ */
+export function allowGuest(req: Request, res: Response, next: NextFunction): void {
+  if (req.session?.user) {
+    return next();
+  }
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    return requireJwt(req, res, next);
+  }
+  (req as any).jwtUser = GUEST_USER;
+  return next();
+}

@@ -14,9 +14,9 @@ const ESCALATE_SEVERITY = 4; // collapse(5)/intrusion(4) → 외부 관제 전�
 
 const TYPE_LABEL: Record<AnomalyType, string> = {
   unpaid_exit: '미결제 퇴장',
-  disturbance: '매장 소란',
+  disturbance: '소란 발생',
   collapse: '고객 쓰러짐',
-  intrusion: '비정상 침입',
+  intrusion: '외부 침입',
 };
 
 export interface AnomalyRow {

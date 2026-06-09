@@ -49,8 +49,8 @@ watch(() => assistant.messages.length, async () => {
   <div class="assistant-view">
     <header class="page-header">
       <div>
-        <h2>AI 챗봇</h2>
-        <p class="subtitle">점포 #{{ storeId }} · 운영 데이터를 근거로 답하고, 근거가 없으면 “데이터 없음”으로 안내합니다.</p>
+        <h2>AI 점포 매니저 어시스턴트</h2>
+        <p class="subtitle">점포 #{{ storeId }} · 운영 데이터를 근거로 답변합니다.</p>
       </div>
       <button class="ghost" @click="assistant.reset()">새 대화</button>
     </header>

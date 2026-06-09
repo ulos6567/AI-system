@@ -16,9 +16,9 @@ const storeId = computed(() => auth.primaryStoreId ?? 1);
 
 const TYPE_LABEL: Record<string, string> = {
   unpaid_exit: '미결제 퇴장',
-  disturbance: '매장 소란',
+  disturbance: '소란 발생',
   collapse: '고객 쓰러짐',
-  intrusion: '비정상 침입',
+  intrusion: '외부 침입',
 };
 const TYPE_ICON: Record<string, string> = {
   unpaid_exit: '🛒',

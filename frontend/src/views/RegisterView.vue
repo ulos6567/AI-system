@@ -34,7 +34,7 @@ function goLogin(): void {
 }
 
 function goHome(): void {
-  router.push({ name: 'home' });
+  router.push({ name: 'dashboard' });
 }
 </script>
 

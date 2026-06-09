@@ -20,7 +20,13 @@ function parseDate(s?: string): Date {
 router.get('/', requireAuth, requireStoreScope(), async (req, res) => {
   const storeId = Number(req.params.storeId);
   const date = parseDate(req.query.date as string | undefined);
-  const rows = await listLatestForecasts(storeId, date);
+  let rows = await listLatestForecasts(storeId, date);
+  // 저장된 예측이 없으면 조회 시점에 즉석 생성해 보충(read-through).
+  //   → 비로그인 게스트도 쓰기 권한(generate POST) 없이 예측 표를 그대로 열람할 수 있다.
+  if (rows.length === 0) {
+    await forecastStoreFor(storeId, date);
+    rows = await listLatestForecasts(storeId, date);
+  }
   res.json({ storeId, targetDate: date.toISOString().slice(0, 10), forecasts: rows });
 });
 

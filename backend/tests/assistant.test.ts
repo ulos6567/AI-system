@@ -22,20 +22,23 @@ describe('assistant intent classification', () => {
 });
 
 describe('assistant routes smoke', () => {
-  it('requires auth (401/403 without session)', async () => {
-    const get = await request(app).get('/api/stores/1/assistant/conversations');
-    expect([401, 403]).toContain(get.status);
-    const post = await request(app).post('/api/stores/1/assistant/ask').send({ message: '오늘 매출은?' });
-    expect([401, 403]).toContain(post.status);
+  it('rejects malformed payload (400) even for guests', async () => {
+    // AI 비서 질의는 비로그인 게스트도 가능하다(읽기 전용). 잘못된 페이로드만 400.
+    const post = await request(app).post('/api/stores/1/assistant/ask').send({});
+    expect(post.status).toBe(400);
   });
 });
 
 describe('assistant grounding does not leak PII', () => {
-  it('unknown intent yields empty grounding → "데이터 없음" 폴백 경로', async () => {
-    // unknown 의도는 어떤 테이블도 조회하지 않으므로 DB 없이도 빈 근거를 반환한다.
+  it('unknown intent falls back to store snapshot (집계만), 근거 조회 실패해도 안전', async () => {
+    // 매칭 의도가 없으면 일반 운영 스냅샷(매출·인기상품·재고 집계)으로 폴백한다.
+    // 스냅샷은 집계 컬럼만 조회하며 고객명/연락처 등 PII 는 절대 포함하지 않는다.
+    // DB 가 없는 단위 테스트 환경에서는 조회가 실패해 빈 근거로 안전하게 떨어진다.
     const g = await buildGrounding(1, '안녕하세요');
     expect(g.intent).toBe('unknown');
-    expect(g.facts.length).toBe(0);
-    expect(g.sources.length).toBe(0);
+    expect(Array.isArray(g.facts)).toBe(true);
+    expect(Array.isArray(g.sources)).toBe(true);
+    // 어떤 근거가 나오든 개인식별정보 패턴(전화번호 등)은 없어야 한다.
+    expect(g.facts.join('\n')).not.toMatch(/01[016789]-?\d{3,4}-?\d{4}/);
   });
 });

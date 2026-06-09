@@ -29,9 +29,13 @@ describe('orders store', () => {
     expect(s.lastResult?.status).toBe('approved');
   });
 
-  it('refreshForecasts falls back to generate when empty', async () => {
+  it('refreshForecasts loads from GET without calling generate (server read-through)', async () => {
+    const { ordersApi } = await import('@/api/orders');
+    (ordersApi.generateForecasts as any).mockClear();
     const s = useOrdersStore();
     await s.refreshForecasts(1, '2026-05-23');
+    // GET 이 서버 측 read-through 로 항상 데이터를 돌려주므로 클라이언트 generate 호출은 없어야 한다.
+    expect(ordersApi.generateForecasts).not.toHaveBeenCalled();
     expect(s.forecasts).toEqual([]);
   });
 });

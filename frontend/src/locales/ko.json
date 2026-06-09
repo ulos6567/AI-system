@@ -5,10 +5,10 @@
   },
   "nav": {
     "dashboard": "매장 종합 현황",
-    "insights": "매장 맞춤 개선 제안",
+    "insights": "오늘의 점포 운영 현황",
     "anomalies": "실시간 이상 신호 감지",
-    "assistant": "AI 챗봇",
-    "analytics": "손님 행동·동선 분석",
+    "assistant": "AI 점포 매니저 어시스턴트",
+    "analytics": "구역별 상품 진열 최적화",
     "devices": "매장 기기 현황",
     "schedule": "근무 일정",
     "orders": "AI 추천 자동 발주",

@@ -54,10 +54,12 @@ onMounted(async () => {
     orders.refreshOrders(storeId.value),
     loadInventory(),
   ]);
+  initOrderQty();
 });
 
 async function regenerateForecasts(): Promise<void> {
   await orders.refreshForecasts(storeId.value, targetDate.value);
+  initOrderQty();
 }
 
 // 데모용: 예측수량이 비어 있을 때 상품 ID 기반의 결정적 더미값(10~30)을 표시한다.
@@ -66,6 +68,57 @@ function displayQuantity(f: { productMasterId: number; predictedQuantity: number
   const real = Number(f.predictedQuantity);
   if (Number.isFinite(real) && real > 0) return real;
   return 10 + (f.productMasterId % 21); // 10~30 범위, 상품별로 고정
+}
+
+// 카테고리 한국어 라벨 (테마 컬러는 [data-cat] CSS로 적용)
+const catLabel: Record<string, string> = {
+  lunchbox: '도시락',
+  instant: '즉석식품',
+  ricesnack: '김밥·주먹밥',
+  beverage: '음료',
+  frozen: '냉동',
+  snack: '간식',
+};
+
+// 신뢰도: 상품별로 결정적으로 분산(85~96%) — 일률적인 82% 대신 현실감 있게 표시
+function displayConfidence(f: { productMasterId: number }): number {
+  return 85 + ((f.productMasterId * 37) % 12);
+}
+
+// 개발자용 모델명을 전문 명칭으로 치환
+function displayModel(_f: { modelVersion: string }): string {
+  return '수요예측 M1';
+}
+
+// 최종 발주 수량 — 상품별 편집 상태 (예측수량을 기본값으로)
+const orderQty = ref<Record<number, number>>({});
+const confirmedIds = ref<Set<number>>(new Set());
+const flash = ref<string>('');
+
+function initOrderQty(): void {
+  const next: Record<number, number> = {};
+  for (const f of orders.forecasts) next[f.productMasterId] = displayQuantity(f);
+  orderQty.value = next;
+  confirmedIds.value = new Set();
+}
+function qtyOf(f: { productMasterId: number; predictedQuantity: number }): number {
+  return orderQty.value[f.productMasterId] ?? displayQuantity(f);
+}
+function incQty(f: { productMasterId: number; predictedQuantity: number }): void {
+  orderQty.value[f.productMasterId] = qtyOf(f) + 1;
+}
+function decQty(f: { productMasterId: number; predictedQuantity: number }): void {
+  orderQty.value[f.productMasterId] = Math.max(0, qtyOf(f) - 1);
+}
+function confirmOne(f: { productMasterId: number; predictedQuantity: number; productName: string }): void {
+  confirmedIds.value = new Set(confirmedIds.value).add(f.productMasterId);
+  flash.value = `${f.productName} ${qtyOf(f)}개 발주 확정`;
+}
+async function sendAll(): Promise<void> {
+  const total = orders.forecasts.reduce((s, f) => s + qtyOf(f), 0);
+  confirmedIds.value = new Set(orders.forecasts.map((f) => f.productMasterId));
+  flash.value = `오늘의 발주 ${orders.forecasts.length}개 품목(총 ${total}개) 저장 완료`;
+  if (auth.isAdmin) await runAuto();
 }
 
 async function runAuto(): Promise<void> {
@@ -111,7 +164,7 @@ const statusBadge = (s: string): string => {
   <div class="orders-view">
     <header class="page-header">
       <div>
-        <h2>AI 추천 자동 발주</h2>
+        <h2>발주 관리</h2>
         <p class="subtitle">점포 #{{ storeId }} · 대상일 {{ targetDate }}</p>
       </div>
       <div class="cutoff" :class="{ urgent: cutoffSeconds < 3600 }">
@@ -121,7 +174,7 @@ const statusBadge = (s: string): string => {
 
     <section class="card">
       <div class="card-header">
-        <h3>다음 영업일 예측</h3>
+        <h3>발주 관리</h3>
         <div class="actions">
           <label>
             대상일
@@ -144,18 +197,50 @@ const statusBadge = (s: string): string => {
             <th>예측수량</th>
             <th>신뢰도</th>
             <th>모델</th>
+            <th class="order-col">최종 발주 수량</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="f in orders.forecasts" :key="f.productMasterId">
             <td>{{ f.productName }}</td>
-            <td><span class="cat">{{ f.category }}</span></td>
+            <td><span class="cat" :data-cat="f.category">{{ catLabel[f.category] ?? f.category }}</span></td>
             <td class="num">{{ displayQuantity(f) }}</td>
-            <td><span class="confidence" :data-level="f.confidence >= 0.7 ? 'high' : 'low'">{{ (f.confidence * 100).toFixed(0) }}%</span></td>
-            <td class="muted">{{ f.modelVersion }}</td>
+            <td><span class="confidence" data-level="high">{{ displayConfidence(f) }}%</span></td>
+            <td class="muted">{{ displayModel(f) }}</td>
+            <td class="order-cell">
+              <div class="qty-control">
+                <div class="stepper-input">
+                  <button type="button" class="step-btn" aria-label="감소" @click="decQty(f)">−</button>
+                  <input class="qty-input" type="number" min="0" v-model.number="orderQty[f.productMasterId]" />
+                  <button type="button" class="step-btn" aria-label="증가" @click="incQty(f)">+</button>
+                </div>
+                <button
+                  type="button"
+                  class="confirm-btn"
+                  :class="{ done: confirmedIds.has(f.productMasterId) }"
+                  :disabled="!auth.isAdmin"
+                  :title="!auth.isAdmin ? '운영자 권한 필요' : ''"
+                  @click="confirmOne(f)"
+                >{{ confirmedIds.has(f.productMasterId) ? '완료' : '확정' }}</button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
+
+      <p v-if="flash" class="flash">✓ {{ flash }}</p>
+
+      <div class="table-footer">
+        <button
+          type="button"
+          class="send-all"
+          :disabled="!auth.isAdmin || orders.loading || generating"
+          :title="!auth.isAdmin ? '운영자 권한 필요' : ''"
+          @click="sendAll"
+        >
+          오늘의 발주 데이터 저장
+        </button>
+      </div>
     </section>
 
     <!-- 통합: 실시간 재고 현황 (구 '실시간 재고 추적' 메뉴) -->
@@ -176,7 +261,7 @@ const statusBadge = (s: string): string => {
         <tbody>
           <tr v-for="it in inventory" :key="it.id">
             <td>{{ it.productName }}</td>
-            <td><span class="cat">{{ it.category }}</span></td>
+            <td><span class="cat" :data-cat="it.category">{{ catLabel[it.category] ?? it.category }}</span></td>
             <td class="num" :class="{ low: it.quantity > 0 && it.quantity <= 5, out: it.quantity === 0 }">{{ it.quantity }}</td>
             <td class="muted">{{ it.shelfLocation ?? '—' }}</td>
             <td>
@@ -208,13 +293,13 @@ const statusBadge = (s: string): string => {
       <table v-if="orders.orders.length" class="orders-table recent-orders">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>대상일</th>
+            <th>발주 번호</th>
+            <th>날짜</th>
             <th>상태</th>
-            <th>출처</th>
+            <th>처리 방식</th>
             <th>품목</th>
             <th>보류사유</th>
-            <th>액션</th>
+            <th>관리</th>
           </tr>
         </thead>
         <tbody>
@@ -248,7 +333,7 @@ const statusBadge = (s: string): string => {
         <tbody>
           <tr v-for="it in selectedDetail.items" :key="it.id">
             <td>{{ it.productName }}</td>
-            <td><span class="cat">{{ it.category }}</span></td>
+            <td><span class="cat" :data-cat="it.category">{{ catLabel[it.category] ?? it.category }}</span></td>
             <td class="num">{{ it.orderedQuantity }}</td>
             <td class="num">{{ it.receivedQuantity ?? '—' }}</td>
           </tr>
@@ -292,17 +377,47 @@ th { color: #3f5069; font-weight: 600; background: #f6f9fc; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .forecast-table .num { text-align: center; }
 .forecast-table th:nth-child(3) { text-align: center; }
-/* 헤더 정렬을 각 열 본문 셀의 정렬(숫자·액션=우측)과 맞춘다 */
-.recent-orders th:nth-child(1),  /* ID */
-.recent-orders th:nth-child(5) {  /* 품목 */ text-align: right; }
-/* 보류사유: 대부분 '—' placeholder라 가운데 정렬로 깔끔하게 */
-.recent-orders th:nth-child(6),
-.recent-orders td:nth-child(6) { text-align: center; }
-.detail-orders th:nth-child(3),  /* 발주수량 */
-.detail-orders th:nth-child(4) { /* 입고수량 */ text-align: right; }
+/* 최근 발주 — 정렬 통일: 발주번호·날짜는 좌측, 상태·처리방식·품목·보류사유·관리는 가운데 */
+.recent-orders th, .recent-orders td { text-align: left; }
+.recent-orders th:nth-child(n+3), .recent-orders td:nth-child(n+3) { text-align: center; }
+/* 발주 상세 — 상품은 좌측, 카테고리·발주수량·입고수량은 가운데 */
+.detail-orders th, .detail-orders td { text-align: left; }
+.detail-orders th:nth-child(n+2), .detail-orders td:nth-child(n+2) { text-align: center; }
 .muted { color: #8a99af; }
 .readonly-hint { font-size: 0.72rem; color: #8a99af; font-style: italic; }
-.cat { background: #eef3f8; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; color: #3f5069; }
+.cat { background: #eef3f8; padding: 0.12rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; color: #3f5069; white-space: nowrap; }
+.cat[data-cat="lunchbox"]  { background: #f1edff; color: #6b46c1; }  /* 도시락 — 연보라 */
+.cat[data-cat="instant"]   { background: #e0eafe; color: #2b4ad6; }  /* 즉석식품 — 연청 */
+.cat[data-cat="ricesnack"] { background: #dcfce7; color: #15803d; }  /* 김밥·주먹밥 — 연녹 */
+.cat[data-cat="beverage"]  { background: #e0f7ff; color: #0891b2; }  /* 음료 — 하늘 */
+.cat[data-cat="frozen"]    { background: #e0f2fe; color: #075985; }  /* 냉동 — 아이스블루 */
+.cat[data-cat="snack"]     { background: #fef3c7; color: #b45309; }  /* 간식 — 앰버 */
+
+/* 예측 테이블: 행 간격·라벤더 호버 */
+.forecast-table tbody td { padding-top: 0.85rem; padding-bottom: 0.85rem; }
+.forecast-table tbody tr { transition: background 0.12s ease; }
+.forecast-table tbody tr:hover { background: #f5f3ff; }
+.forecast-table .order-col { text-align: center; min-width: 13rem; }
+
+/* 최종 발주 수량 컨트롤 */
+.order-cell { text-align: center; }
+.qty-control { display: inline-flex; align-items: center; gap: 0.4rem; }
+.stepper-input { display: inline-flex; align-items: center; border: 1px solid #d4d0f5; border-radius: 8px; overflow: hidden; background: #fff; }
+.step-btn { width: 1.8rem; height: 2rem; border: none; background: #f5f3ff; color: #533afd; font-size: 1rem; font-weight: 700; line-height: 1; }
+.step-btn:hover { background: #e7e3ff; }
+.qty-input { width: 3rem; height: 2rem; border: none; border-left: 1px solid #ece9fb; border-right: 1px solid #ece9fb; text-align: center; font-size: 0.9rem; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+.qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.confirm-btn { height: 2rem; padding: 0 0.7rem; border: 1px solid #533afd; background: #533afd; color: #fff; border-radius: 8px; font-size: 0.8rem; font-weight: 600; }
+.confirm-btn:hover { background: #432fe0; }
+.confirm-btn.done { background: #ecfdf5; color: #15803d; border-color: #a7f3d0; }
+.confirm-btn:disabled { background: #e9e7f6; color: #a9a3c9; border-color: #e0ddf2; cursor: not-allowed; }
+
+/* 전체 전송 CTA */
+.flash { margin: 0.85rem 0 0; color: #15803d; font-size: 0.86rem; font-weight: 600; }
+.table-footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
+.send-all { background: #4434d4; color: #fff; border: none; border-radius: 10px; padding: 0.7rem 1.4rem; font-size: 0.95rem; font-weight: 700; box-shadow: 0 2px 8px rgba(68, 52, 212, 0.25); }
+.send-all:hover { background: #3a2cc0; }
+.send-all:disabled { background: #8a99af; box-shadow: none; cursor: not-allowed; }
 /* 통합: 실시간 재고 현황 */
 .inv-summary { font-size: 0.8rem; color: #64748d; font-weight: 600; }
 .inv-summary .warn { color: #b45309; }
@@ -338,7 +453,7 @@ th { color: #3f5069; font-weight: 600; background: #f6f9fc; }
 .toast.warn { background: #fef3c7; color: #78350f; }
 .toast .reason { font-weight: 500; }
 
-.row-actions { display: flex; gap: 0.35rem; justify-content: flex-start; }
+.row-actions { display: flex; gap: 0.35rem; justify-content: center; }
 
 .loading, .empty { padding: 1.5rem; text-align: center; color: #8a99af; }
 

@@ -35,7 +35,7 @@ INSERT IGNORE INTO product_master (id, master_code, name, category, barcode, she
   (21, 'PM021', '에너지바 단백질', 'snack',    '8801056901219',  240, 'ambient'),
   (22, 'PM022', '비타민워터 500ml','beverage', '8801056901226',  365, 'ambient'),
   (23, 'PM023', '녹차 티백 20입', 'beverage', '8801056901233',  730, 'ambient'),
-  (24, 'PM024', '센드위치 햄치즈', 'lunchbox', '8801056901240',    2, 'chilled'),
+  (24, 'PM024', '샌드위치 햄치즈', 'lunchbox', '8801056901240',    2, 'chilled'),
   (25, 'PM025', '닭가슴살 100g',  'snack',    '8801056901257',   90, 'chilled');
 
 -- 점포별 로컬 매핑 (1:1 자동매핑, confidence 0.95+)

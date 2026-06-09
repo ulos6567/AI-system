@@ -17,22 +17,21 @@ const navGroups = [
     label: '홈',
     items: [
       { name: 'dashboard',     label: '매장 종합 현황',   icon: '🏠' },
-      { name: 'self-checkout', label: 'AI 결제 시뮬레이터', icon: '🛒' },
     ],
   },
   {
-    label: 'AI 스마트 분석',
+    label: '매장 분석',
     items: [
-      { name: 'assistant', label: 'AI 챗봇',           icon: '🤖' },
-      { name: 'insights',  label: '매장 맞춤 개선 제안', icon: '💡' },
-      { name: 'analytics', label: '손님 행동·동선 분석', icon: '🗺️' },
+      { name: 'assistant', label: 'AI 점포 매니저 어시스턴트', icon: '🤖' },
+      { name: 'insights',  label: '오늘의 점포 운영 현황', icon: '💡' },
+      { name: 'analytics', label: '구역별 상품 진열 최적화', icon: '🗺️' },
     ],
   },
   {
-    label: '자동화 관리',
+    label: '매장 관리',
     items: [
-      { name: 'orders',         label: 'AI 추천 자동 발주',  icon: '📦' },
-      { name: 'pricing-rules',  label: '실시간 스마트 가격 설정', icon: '💲' },
+      { name: 'orders',         label: '발주 관리',  icon: '📦' },
+      { name: 'pricing-rules',  label: '실시간 가격 설정', icon: '💲' },
       { name: 'mappings',       label: '상품 코드 관리',     icon: '🔗' },
       { name: 'local-delivery', label: '로컬 상생 배송 관리', icon: '🚚' },
     ],
@@ -80,7 +79,40 @@ onMounted(async () => {
 <template>
   <div class="shell">
     <header class="topbar">
-      <div class="brand">AI 점포 운영</div>
+      <button type="button" class="brand" @click="router.push({ name: 'dashboard' })">
+        <svg class="brand-icon" viewBox="0 0 32 32" aria-hidden="true">
+          <defs>
+            <linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#6366f1" />
+              <stop offset="1" stop-color="#4338ca" />
+            </linearGradient>
+            <linearGradient id="brandSheen" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#fff" stop-opacity="0.22" />
+              <stop offset="0.5" stop-color="#fff" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="32" height="32" rx="9" fill="url(#brandGrad)" />
+          <rect x="0" y="0" width="32" height="32" rx="9" fill="url(#brandSheen)" />
+          <!-- 점포(스토어프론트) 아이콘 — 차양·본체·출입문 -->
+          <path
+            d="M8 13 V10 H24 V13"
+            fill="none"
+            stroke="#fff"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M9.5 13 V23 H22.5 V13 M14.5 23 V17.5 H18.5 V23"
+            fill="none"
+            stroke="#fff"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span class="brand-text"><strong>AI 점포</strong> 운영 효율화</span>
+      </button>
       <div class="meta">
         <span class="store">{{ currentStore }}</span>
         <span class="conn" :class="{ ok: connected }" :title="connected ? '실시간 연결됨' : '재연결 시도 중…'">
@@ -89,6 +121,14 @@ onMounted(async () => {
         <button class="bell" aria-label="notifications" @click="events.togglePanel()">
           🔔
           <span v-if="events.unreadCount > 0" class="badge">{{ events.unreadCount > 99 ? '99+' : events.unreadCount }}</span>
+        </button>
+        <button
+          class="sim-btn"
+          :class="{ active: route.name === 'self-checkout' }"
+          title="발표·시연용 결제 시뮬레이터 열기"
+          @click="router.push({ name: 'self-checkout' })"
+        >
+          🛒 AI 결제 시뮬레이터
         </button>
         <template v-if="auth.isAuthenticated">
           <span class="user">{{ auth.user?.displayName }}</span>
@@ -107,7 +147,18 @@ onMounted(async () => {
     <!-- 상단 가로 메뉴바 — 3개 카테고리 드롭다운 -->
     <nav class="topnav" aria-label="주 메뉴">
       <div v-for="g in navGroups" :key="g.label" class="nav-group">
+        <!-- 항목이 하나뿐인 그룹(홈)은 드롭다운 없이 바로 이동하는 직접 링크 -->
+        <router-link
+          v-if="g.items.length === 1"
+          :to="{ name: g.items[0].name }"
+          class="nav-trigger nav-direct"
+          :class="{ active: route.name === g.items[0].name }"
+          @click="openGroup = null"
+        >
+          <span>{{ g.label }}</span>
+        </router-link>
         <button
+          v-else
           class="nav-trigger"
           :class="{ active: isGroupActive(g), open: openGroup === g.label }"
           @click="toggleGroup(g.label)"
@@ -115,7 +166,7 @@ onMounted(async () => {
           <span>{{ g.label }}</span>
           <span class="caret">▾</span>
         </button>
-        <div v-if="openGroup === g.label" class="nav-menu">
+        <div v-if="g.items.length > 1 && openGroup === g.label" class="nav-menu">
           <router-link
             v-for="item in g.items"
             :key="item.name"
@@ -140,7 +191,6 @@ onMounted(async () => {
       <template v-else>
         👁 로그인 없이 둘러보는 중입니다. 데이터 조회는 자유롭게, 수정은 <a class="banner-link" @click="router.push({ name: 'login' })">로그인</a> 후 관리자만 가능합니다.
       </template>
-      <span class="banner-sub">AI 결제 시뮬레이터는 누구나 이용할 수 있어요.</span>
     </div>
 
     <main class="content" :class="{ 'bg-cool': route.name === 'dashboard' }">
@@ -172,7 +222,12 @@ onMounted(async () => {
   top: 0;
   z-index: 10;
 }
-.brand { font-weight: 700; }
+.brand { display: flex; align-items: center; gap: 0.5rem; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.brand:hover .brand-text { color: #fff; }
+.brand:focus-visible { outline: 2px solid rgba(99, 102, 241, 0.7); outline-offset: 3px; border-radius: 8px; }
+.brand-icon { width: 28px; height: 28px; flex-shrink: 0; border-radius: 9px; box-shadow: 0 4px 12px rgba(67, 56, 202, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.brand-text { font-size: 1.02rem; letter-spacing: -0.01em; line-height: 1; color: #eef3f8; font-weight: 800; }
+.brand-text strong { font-weight: 800; }
 .meta { margin-left: auto; display: flex; align-items: center; gap: 0.55rem; font-size: 0.85rem; }
 .store { background: #1c1e54; padding: 0.2rem 0.5rem; border-radius: 4px; }
 .conn { font-size: 0.7rem; opacity: 0.6; }
@@ -220,6 +275,24 @@ onMounted(async () => {
   transition: background 0.15s ease;
 }
 .logout:hover { background: var(--primary-press); }
+/* 발표·시연 전용 독립 버튼 — 관리자 흐름과 분리, 아웃라인 스타일로 은은하게 */
+.sim-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(99, 102, 241, 0.12);
+  color: #c7cdf6;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  border-radius: var(--r-pill);
+  padding: 0.38rem 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.sim-btn:hover { background: rgba(99, 102, 241, 0.22); color: #fff; border-color: rgba(129, 140, 248, 0.7); }
+.sim-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .readonly-banner {
   /* 보라 톤과 어울리는 연한 라벤더 틴트(반투명) + 다크 그레이 글자로 은은하게 */
   background: rgba(83, 58, 253, 0.07);
@@ -230,7 +303,6 @@ onMounted(async () => {
   font-weight: 500;
   text-align: center;
 }
-.banner-sub { color: #64748d; margin-left: 0.4rem; }
 .banner-link { color: #533afd; text-decoration: underline; cursor: pointer; }
 
 /* 상단 메뉴바 — 3개 카테고리 드롭다운 (헤더 바로 아래 고정) */
@@ -266,6 +338,7 @@ onMounted(async () => {
 .nav-trigger.active { background: rgba(83, 58, 253, 0.1); color: #4434d4; font-weight: 600; }
 .nav-trigger.open { background: #eef3f8; }
 .nav-trigger .caret { font-size: 0.7rem; opacity: 0.55; }
+.nav-direct { text-decoration: none; }
 .nav-menu {
   position: absolute;
   top: calc(100% + 6px);
