@@ -176,7 +176,7 @@ function assignSupply(q: SupportRequest): void {
     <div class="main-grid">
       <!-- 좌측: 접수 목록 -->
       <section class="card col-left">
-        <div class="card-header"><h3>실시간 기부 · 배송 접수 목록</h3></div>
+        <div class="card-header"><h3>기부·배송 접수 목록</h3></div>
         <table class="receipt-table">
           <thead>
             <tr>
@@ -191,17 +191,21 @@ function assignSupply(q: SupportRequest): void {
           <tbody>
             <tr v-for="(r, i) in receipts" :key="i">
               <td><span class="kind" :class="r.kind">{{ kindLabel[r.kind] }}</span></td>
-              <td class="product">{{ r.product }}</td>
+              <td class="product">
+                {{ r.product }}
+                <span v-if="r.kind === 'donation'" class="unsold-tag">[타임세일 미판매분]</span>
+              </td>
               <td class="center qty">{{ r.qty }}</td>
               <td class="dest">{{ r.dest }}</td>
               <td class="center"><span class="stage" :class="r.stage"><span class="dot"></span>{{ stageLabel[r.stage] }}</span></td>
               <td class="center">
                 <button
                   class="manage-btn"
+                  :class="{ approve: r.stage === 'wait' }"
                   :disabled="!auth.isAdmin || r.stage === 'done'"
-                  :title="!auth.isAdmin ? '운영자 권한 필요' : (r.stage === 'done' ? '완료된 건' : '')"
+                  :title="!auth.isAdmin ? '운영자 권한 필요' : (r.stage === 'done' ? '완료된 건' : (r.stage === 'wait' ? '점주 최종 승인 후 배송 단계로 전환됩니다' : ''))"
                   @click="advanceStage(i)"
-                >{{ r.stage === 'done' ? '완료' : '상태 변경' }}</button>
+                >{{ r.stage === 'done' ? '완료' : (r.stage === 'wait' ? '최종 승인' : '상태 변경') }}</button>
               </td>
             </tr>
           </tbody>
@@ -274,6 +278,13 @@ h2 { margin: 0; font-size: 1.35rem; }
 }
 .manage-btn:hover:not(:disabled) { background: #e7e3ff; }
 .manage-btn:disabled { background: #f4f6f9; color: #b6bdc8; border-color: #e7ebf0; opacity: 0.7; cursor: not-allowed; }
+/* 기부 대기 행 — 점주 최종 승인(인간 제어권) 강조: 채워진 강조 버튼 + 은은한 펄스 */
+.manage-btn.approve { background: #4434d4; color: #fff; border-color: #4434d4; box-shadow: 0 0 0 0 rgba(68, 52, 212, 0.4); animation: approve-pulse 1.8s ease-in-out infinite; }
+.manage-btn.approve:hover:not(:disabled) { background: #3a2cc0; border-color: #3a2cc0; }
+@keyframes approve-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(68, 52, 212, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(68, 52, 212, 0); }
+}
 
 /* 부드러운 고급 그림자 토큰 */
 /* 상단 현황판 */
@@ -297,7 +308,7 @@ h2 { margin: 0; font-size: 1.35rem; }
 
 /* 메인 2분할 (12열 그리드) */
 .main-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; align-items: start; }
-.col-left { grid-column: span 7; }
+.col-left { grid-column: span 7; overflow-x: auto; }
 .col-right { grid-column: span 5; }
 .card { background: #fff; border: 1px solid #f0f2f7; border-radius: 14px; padding: 1.5rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.04); }
 .card-header { margin-bottom: 1rem; }
@@ -305,13 +316,17 @@ h2 { margin: 0; font-size: 1.35rem; }
 
 /* 접수 목록 테이블 */
 .receipt-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-.receipt-table th, .receipt-table td { padding: 0.95rem 0.85rem; text-align: left; border-bottom: 1px solid #eef3f8; vertical-align: middle; }
+.receipt-table th, .receipt-table td { padding: 0.95rem 0.85rem; text-align: left; border-bottom: 1px solid #eef3f8; vertical-align: middle; white-space: nowrap; }
 .receipt-table thead th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 14px; }
 .receipt-table th.center, .receipt-table td.center { text-align: center; }
+/* 구분 컬럼: 헤더 '구분'과 복지기부/단골배송 뱃지를 가운데로 정렬 통일 */
+.receipt-table th:first-child, .receipt-table td:first-child { text-align: center; }
 .receipt-table tbody tr:last-child td { border-bottom: none; }
 .receipt-table tbody tr { transition: background 0.12s ease; }
 .receipt-table tbody tr:hover td { background: rgba(248, 250, 252, 0.8); }
 .product { font-weight: 700; color: #1c1e54; }
+/* 타임세일 미판매분 — 가격 인하 후에도 안 팔린 잉여분이 기부로 흐르는 Closed-Loop 표식 */
+.unsold-tag { margin-left: 0.4rem; font-size: 0.7rem; font-weight: 600; color: #b45309; background: #fff7ed; border: 1px solid #fde6c8; padding: 0.05rem 0.4rem; border-radius: 6px; white-space: nowrap; vertical-align: middle; }
 .qty { font-variant-numeric: tabular-nums; color: #334155; }
 .dest { color: #475569; }
 

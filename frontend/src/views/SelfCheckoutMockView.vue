@@ -36,12 +36,12 @@ const DEMO_BEHAVIOR = (() => {
     { type: 'pickup', zone: 'B-도시락', product: '불고기 도시락', dwell: 12, ago: 35 },
     { type: 'dwell', zone: 'A-음료', product: null, dwell: 28, ago: 92 },
     { type: 'pickup', zone: 'A-음료', product: '삼다수 500ml', dwell: 7, ago: 138 },
-    { type: 'putback', zone: 'C-스낵', product: '포카칩 오리지널', dwell: 9, ago: 205 },
+    { type: 'putback', zone: 'C-스낵', product: '포카칩', dwell: 9, ago: 205 },
     { type: 'pickup', zone: 'B-도시락', product: '제육 도시락', dwell: 15, ago: 270 },
     { type: 'zone_enter', zone: 'D-냉장', product: null, dwell: null, ago: 332 },
     { type: 'pickup', zone: 'C-스낵', product: '새우깡', dwell: 6, ago: 401 },
     { type: 'dwell', zone: 'B-도시락', product: null, dwell: 33, ago: 470 },
-    { type: 'pickup', zone: 'A-음료', product: '바나나우유 240ml', dwell: 8, ago: 540 },
+    { type: 'pickup', zone: 'A-음료', product: '바나나우유', dwell: 8, ago: 540 },
     { type: 'putback', zone: 'A-음료', product: '카페라떼 컵', dwell: 11, ago: 612 },
   ];
   return specs.map((s, i) => ({

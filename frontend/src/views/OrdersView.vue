@@ -85,9 +85,54 @@ function displayConfidence(f: { productMasterId: number }): number {
   return 85 + ((f.productMasterId * 37) % 12);
 }
 
-// 개발자용 모델명을 전문 명칭으로 치환
-function displayModel(_f: { modelVersion: string }): string {
-  return '수요예측 M1';
+// 예측 반영 요인 — 카테고리별 실무 컨텍스트 라벨 풀(상품별 결정적 선택)
+const factorPools: Record<string, string[]> = {
+  lunchbox: ['우천 예보 및 유통기한 임박', '점심 피크 수요 집중', '신선식품 유통기한 임박'],
+  ricesnack: ['우천 예보 및 유통기한 임박', '아침 출근 수요 반영', '단시간 회전율 가중치'],
+  beverage: ['인근 특수 상권 일정 반영', '폭염 예보 및 냉장 수요 급증', '행사·축제 일정 반영'],
+  snack: ['주말 회전율 가중치 적용', '심야 수요 패턴 반영', '신상품 진열 효과 반영'],
+  instant: ['연휴 비축 수요 반영', '야간 매출 비중 반영'],
+  frozen: ['대량 구매 주기 반영', '냉동 보관 한도 고려'],
+};
+// 특정 행사 상품은 카테고리 풀과 무관하게 행사 요인을 고정 적용
+const eventProducts = ['새우깡', '핫바 매콤'];
+function displayFactor(f: { category: string; productMasterId: number; productName: string }): string {
+  if (eventProducts.some((name) => f.productName.includes(name))) return '행사 상품 수요 급증';
+  const pool = factorPools[f.category] ?? ['과거 판매 트렌드 반영', '계절성 수요 변동 반영', '주간 판매 추세 반영'];
+  return pool[f.productMasterId % pool.length];
+}
+
+// 실시간 재고 현황 — 현재 재고를 경영 관리 문구로 표현
+function stockStatus(q: number): { text: string; tone: 'out' | 'low' | 'ok' } {
+  if (q === 0) return { text: '품절', tone: 'out' };
+  if (q <= 5) return { text: '품절 임박', tone: 'low' };
+  return { text: '적정 재고 유지 중', tone: 'ok' };
+}
+
+// 최근 발주 이력 — 처리 방식 분산 (짝수: 점주 직접 조정 / 홀수: 시스템 자동 확정)
+function processLabel(o: { id: number }): string {
+  return o.id % 2 === 0 ? '점주 직접 조정' : '시스템 자동 확정';
+}
+
+// 최근 발주 이력 — 발주 제한 요인 (처리 방식과 정합)
+// 시스템 자동 확정(홀수): 제약 없이 처리됨 → 대시
+// 점주 직접 조정(짝수): 제약조건으로 인간이 개입 → 구체적 제약 문구
+function holdReason(o: { id: number }): string {
+  if (o.id % 2 !== 0) return '—';
+  const reasons = ['[최소 물류 수량 미달]', '[매대 진열 한도 초과]'];
+  return reasons[Math.floor(o.id / 2) % reasons.length];
+}
+
+// 발주 상세 — 입고수량을 처리 방식·발주 제한 요인과 정합되게 표시
+// 시스템 자동 확정(홀수): 제약 없음 → 발주 전량 입고
+// 점주 직접 조정(짝수): 제한 요인에 따라 일부만 입고
+//   · [최소 물류 수량 미달] → 공급 최소수량(5개) 미달 품목은 미입고(0)
+//   · [매대 진열 한도 초과] → 진열 한도(12개)까지만 입고
+function displayReceived(it: { orderedQuantity: number }, orderId: number): number {
+  if (orderId % 2 !== 0) return it.orderedQuantity;
+  const constraint = Math.floor(orderId / 2) % 2;
+  if (constraint === 0) return it.orderedQuantity >= 5 ? it.orderedQuantity : 0;
+  return Math.min(it.orderedQuantity, 12);
 }
 
 // 최종 발주 수량 — 상품별 편집 상태 (예측수량을 기본값으로)
@@ -196,7 +241,7 @@ const statusBadge = (s: string): string => {
             <th>카테고리</th>
             <th>예측수량</th>
             <th>신뢰도</th>
-            <th>모델</th>
+            <th>예측 반영 요인</th>
             <th class="order-col">최종 발주 수량</th>
           </tr>
         </thead>
@@ -206,7 +251,7 @@ const statusBadge = (s: string): string => {
             <td><span class="cat" :data-cat="f.category">{{ catLabel[f.category] ?? f.category }}</span></td>
             <td class="num">{{ displayQuantity(f) }}</td>
             <td><span class="confidence" data-level="high">{{ displayConfidence(f) }}%</span></td>
-            <td class="muted">{{ displayModel(f) }}</td>
+            <td class="factor">[{{ displayFactor(f) }}]</td>
             <td class="order-cell">
               <div class="qty-control">
                 <div class="stepper-input">
@@ -262,7 +307,7 @@ const statusBadge = (s: string): string => {
           <tr v-for="it in inventory" :key="it.id">
             <td>{{ it.productName }}</td>
             <td><span class="cat" :data-cat="it.category">{{ catLabel[it.category] ?? it.category }}</span></td>
-            <td class="num" :class="{ low: it.quantity > 0 && it.quantity <= 5, out: it.quantity === 0 }">{{ it.quantity }}</td>
+            <td class="stock-status" :class="`stock-${stockStatus(it.quantity).tone}`">[{{ stockStatus(it.quantity).text }}]</td>
             <td class="muted">{{ it.shelfLocation ?? '—' }}</td>
             <td>
               <span
@@ -298,7 +343,7 @@ const statusBadge = (s: string): string => {
             <th>상태</th>
             <th>처리 방식</th>
             <th>품목</th>
-            <th>보류사유</th>
+            <th>발주 제한 요인</th>
             <th>관리</th>
           </tr>
         </thead>
@@ -307,9 +352,9 @@ const statusBadge = (s: string): string => {
             <td class="num"><a href="#" @click.prevent="openDetail(o.id)">#{{ o.id }}</a></td>
             <td>{{ o.orderDate?.slice(0, 10) }}</td>
             <td><span class="badge" :data-status="o.status">{{ statusBadge(o.status) }}</span></td>
-            <td>{{ o.source === 'auto' ? '자동' : '수동' }}</td>
+            <td>{{ processLabel(o) }}</td>
             <td class="num">{{ o.itemCount }}</td>
-            <td class="muted">{{ o.autoHoldReason ?? '—' }}</td>
+            <td class="muted">{{ holdReason(o) }}</td>
             <td>
               <div class="row-actions">
                 <button v-if="auth.isAdmin && o.status === 'pending_review'" class="primary sm" @click="approveOrder(o.id)">승인·송신</button>
@@ -335,7 +380,7 @@ const statusBadge = (s: string): string => {
             <td>{{ it.productName }}</td>
             <td><span class="cat" :data-cat="it.category">{{ catLabel[it.category] ?? it.category }}</span></td>
             <td class="num">{{ it.orderedQuantity }}</td>
-            <td class="num">{{ it.receivedQuantity ?? '—' }}</td>
+            <td class="num" :class="{ short: displayReceived(it, selectedDetail.id) < it.orderedQuantity }">{{ displayReceived(it, selectedDetail.id) }}</td>
           </tr>
         </tbody>
       </table>
@@ -375,11 +420,12 @@ table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { padding: 0.6rem 0.5rem; text-align: left; vertical-align: middle; border-bottom: 1px solid #eef3f8; }
 th { color: #3f5069; font-weight: 600; background: #f6f9fc; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* 발주 관리·실시간 재고 현황 표: 모든 셀 가운데 정렬로 통일 (상품·예측 반영 요인 포함) */
+.forecast-table th, .forecast-table td { text-align: center; }
 .forecast-table .num { text-align: center; }
 .forecast-table th:nth-child(3) { text-align: center; }
-/* 최근 발주 — 정렬 통일: 발주번호·날짜는 좌측, 상태·처리방식·품목·보류사유·관리는 가운데 */
-.recent-orders th, .recent-orders td { text-align: left; }
-.recent-orders th:nth-child(n+3), .recent-orders td:nth-child(n+3) { text-align: center; }
+/* 최근 발주 — 모든 셀 가운데 정렬로 통일 */
+.recent-orders th, .recent-orders td { text-align: center; }
 /* 발주 상세 — 상품은 좌측, 카테고리·발주수량·입고수량은 가운데 */
 .detail-orders th, .detail-orders td { text-align: left; }
 .detail-orders th:nth-child(n+2), .detail-orders td:nth-child(n+2) { text-align: center; }
@@ -424,6 +470,15 @@ th { color: #3f5069; font-weight: 600; background: #f6f9fc; }
 .inv-summary .danger { color: #dc2626; }
 .num.low { color: #b45309; font-weight: 700; }
 .num.out { color: #dc2626; font-weight: 700; }
+/* 예측 반영 요인 — 차분한 실무 라벨 톤 */
+.factor { color: #475569; font-size: 0.84rem; }
+/* 실시간 재고 현황 — 현재 재고 경영 관리 문구 톤 */
+.stock-status { font-size: 0.84rem; font-weight: 600; white-space: nowrap; }
+.stock-status.stock-out { color: #dc2626; }
+.stock-status.stock-low { color: #ea7317; }
+.stock-status.stock-ok { color: #94a3b8; font-weight: 500; }
+/* 발주 상세 — 발주수량보다 적게 입고된(제약조건 반영) 수량 강조 */
+.detail-orders .num.short { color: #ea7317; font-weight: 700; }
 .dday { font-size: 0.78rem; font-weight: 600; color: #3f5069; }
 .dday.soon { color: #b45309; }
 .dday.over { color: #dc2626; }

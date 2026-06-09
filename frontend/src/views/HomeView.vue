@@ -95,7 +95,7 @@ const board = [
     accent: 'var(--brand-pink)',
     items: [
       { t: '삼각김밥 (참치)', q: '제안 48개', tag: '수요 ↑', tint: 'rose' },
-      { t: '바나나우유 240ml', q: '제안 24개', tag: '재고 부족', tint: 'peach' },
+      { t: '바나나우유', q: '제안 24개', tag: '재고 부족', tint: 'peach' },
     ],
   },
   {
