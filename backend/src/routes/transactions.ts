@@ -11,6 +11,7 @@ import { getPosAdapter } from '../adapters/factory';
 import { getPool } from '../db/pool';
 import type { PosTransaction } from '../ports/pos';
 import { logger } from '../lib/logger';
+import { recordCheckout, getCheckoutMetrics } from '../services/checkout-metric';
 
 const router = Router({ mergeParams: true });
 
@@ -152,6 +153,47 @@ router.post('/ingest', requireAuth, requireStoreScope(), async (req, res) => {
     logger.error({ err: err.message, storeId }, 'ingest failed');
     res.status(500).json({ error: 'ingest_failed', detail: err.message });
   }
+});
+
+/**
+ * T016a (003) — 셀프 결제 대기시간 계측 (FR-006, SC-004)
+ *   POST /api/stores/:storeId/transactions/checkout-metric  — 결제 1건 계측 기록
+ *   GET  /api/stores/:storeId/transactions/checkout-metrics  — 통계(p95, withinSlaPct)
+ */
+const CheckoutMetricSchema = z.object({
+  externalId: z.string().min(1).optional(),
+  channel: z.enum(['self', 'staff']).default('self'),
+  startedAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}/)),
+  completedAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}/)).optional(),
+  outcome: z.enum(['completed', 'abandoned']).optional(),
+});
+
+router.post('/checkout-metric', requireAuth, requireStoreScope(), async (req, res) => {
+  const storeId = Number(req.params.storeId);
+  const parsed = CheckoutMetricSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_payload', detail: parsed.error.flatten() });
+    return;
+  }
+  const { externalId, channel, startedAt, completedAt, outcome } = parsed.data;
+  const result = await recordCheckout({
+    storeId,
+    externalId,
+    channel,
+    startedAt: new Date(startedAt),
+    completedAt: completedAt ? new Date(completedAt) : null,
+    outcome,
+  });
+  res.status(201).json(result);
+});
+
+router.get('/checkout-metrics', requireAuth, requireStoreScope(), async (req, res) => {
+  const storeId = Number(req.params.storeId);
+  const from = req.query.from ? new Date(String(req.query.from)) : null;
+  const to = req.query.to ? new Date(String(req.query.to)) : null;
+  const channel = (req.query.channel as 'self' | 'staff' | undefined) ?? 'self';
+  const metrics = await getCheckoutMetrics({ storeId, from, to, channel });
+  res.json(metrics);
 });
 
 export default router;

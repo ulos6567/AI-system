@@ -80,6 +80,52 @@ export async function upsertMapping(opts: {
   return { productMasterId, confidence, status };
 }
 
+/**
+ * T011a (003) — 표준 매핑 커버리지 리포트 (FR-003, SC-006)
+ *   - mapped   = status IN ('auto','confirmed')  (표준 마스터에 매핑 확정/고신뢰 자동)
+ *   - unmapped = status IN ('pending','rejected') (미확정 → 검토 필요, 명시)
+ *   - coveragePct = mapped / total * 100  (SC-006 목표 ≥ 95)
+ *   - 추정값을 확정으로 집계하지 않는다(FR-002): pending은 unmapped로 분류.
+ */
+export interface MappingCoverage {
+  storeId: number;
+  total: number;
+  mapped: number;
+  unmapped: number;
+  coveragePct: number;
+  byStatus: Record<string, number>;
+  unmappedItems: Array<{ localCode: string; localName: string; status: string }>;
+}
+
+export async function getMappingCoverage(storeId: number): Promise<MappingCoverage> {
+  const pool = getPool();
+  const [counts] = await pool.query<any[]>(
+    `SELECT status, COUNT(*) AS cnt
+       FROM product_local_mapping
+      WHERE store_id = ?
+      GROUP BY status`,
+    [storeId],
+  );
+  const byStatus: Record<string, number> = {};
+  for (const r of counts) byStatus[r.status] = Number(r.cnt);
+
+  const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
+  const mapped = (byStatus.auto ?? 0) + (byStatus.confirmed ?? 0);
+  const unmapped = total - mapped;
+  const coveragePct = total > 0 ? Math.round((mapped / total) * 10000) / 100 : 0;
+
+  const [unmappedRows] = await pool.query<any[]>(
+    `SELECT local_code AS localCode, local_name AS localName, status
+       FROM product_local_mapping
+      WHERE store_id = ? AND status IN ('pending','rejected')
+      ORDER BY updated_at DESC
+      LIMIT 500`,
+    [storeId],
+  );
+
+  return { storeId, total, mapped, unmapped, coveragePct, byStatus, unmappedItems: unmappedRows };
+}
+
 export async function listPendingMappings(storeId: number): Promise<any[]> {
   const pool = getPool();
   const [rows] = await pool.query<any[]>(

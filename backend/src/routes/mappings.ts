@@ -10,9 +10,16 @@ import { requireAuth } from '../middleware/auth/jwt';
 import { requireStoreScope, requireAdmin } from '../middleware/rbac';
 import { getPool } from '../db/pool';
 import { audit } from '../lib/audit';
-import { upsertMapping } from '../services/product-mapping';
+import { upsertMapping, getMappingCoverage } from '../services/product-mapping';
 
 const router = Router({ mergeParams: true });
+
+// T011a (003) — 표준화 커버리지·미매핑 리포트 (FR-003, SC-006)
+router.get('/coverage', requireAuth, requireStoreScope(), async (req, res) => {
+  const storeId = Number(req.params.storeId);
+  const coverage = await getMappingCoverage(storeId);
+  res.json(coverage);
+});
 
 router.get('/', requireAuth, requireStoreScope(), async (req, res) => {
   const storeId = Number(req.params.storeId);

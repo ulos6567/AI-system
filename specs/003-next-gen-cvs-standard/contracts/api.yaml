@@ -1,0 +1,291 @@
+openapi: 3.0.3
+info:
+  title: 차세대 편의점 표준 모델 — 통합·완성 계층 API (003)
+  version: 1.0.0
+  description: >
+    001(실행)·002(지능) 위에 증분 추가/확장되는 엔드포인트.
+    데이터 허브 표준화, 무대기 셀프 결제, 오프라인 백업 결제,
+    외부 데이터 연동, KPI 통합 대시보드, 거버넌스.
+    인증/권한은 001 RBAC 재사용(가맹점주/직원/고객 분리).
+
+servers:
+  - url: /api
+
+tags:
+  - name: mappings
+  - name: transactions
+  - name: external
+  - name: dashboard
+  - name: consent
+
+paths:
+  /mappings/standard:
+    get:
+      tags: [mappings]
+      summary: 표준 상품 마스터·매핑 조회 (FR-001, FR-004)
+      parameters:
+        - { in: query, name: storeId, schema: { type: integer } }
+        - { in: query, name: status, schema: { type: string, enum: [mapped, unmapped, review] } }
+      responses:
+        "200":
+          description: 매핑 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProductCodeMapping" }
+    post:
+      tags: [mappings]
+      summary: 점포 원시코드 → 표준코드 매핑 등록/수정 (FR-001, FR-004)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MappingUpsert" }
+      responses:
+        "200": { description: 등록/수정됨 }
+        "422": { description: 검증 실패(추정 매핑 금지 위반 등) }
+
+  /mappings/coverage:
+    get:
+      tags: [mappings]
+      summary: 표준화 커버리지·미매핑 리포트 (FR-003, SC-006)
+      parameters:
+        - { in: query, name: storeId, schema: { type: integer } }
+      responses:
+        "200":
+          description: 커버리지 리포트
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CoverageReport" }
+
+  /transactions/self-checkout:
+    post:
+      tags: [transactions]
+      summary: 고객 셀프 결제 (FR-005~007) — 거버넌스 게이트 통과 필수
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SelfCheckoutRequest" }
+      responses:
+        "201":
+          description: 결제 완료(대기시간 계측 포함)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckoutResult" }
+        "403": { description: 거버넌스 게이트(동의 미확보) 차단 (FR-007, FR-017) }
+        "409": { description: 멱등 충돌(중복 결제) }
+
+  /transactions/metrics:
+    get:
+      tags: [transactions]
+      summary: 셀프 결제 대기시간 지표 (FR-006, SC-004)
+      parameters:
+        - { in: query, name: storeId, schema: { type: integer } }
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: 대기시간 통계(p95 등)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckoutMetrics" }
+
+  /transactions/buffer:
+    get:
+      tags: [transactions]
+      summary: 오프라인 결제 버퍼 상태 조회 (FR-008, FR-010)
+      parameters:
+        - { in: query, name: storeId, schema: { type: integer } }
+        - { in: query, name: syncStatus, schema: { type: string, enum: [buffered, syncing, synced, failed] } }
+      responses:
+        "200":
+          description: 버퍼 거래 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BufferedPayment" }
+
+  /transactions/buffer/sync:
+    post:
+      tags: [transactions]
+      summary: 복구 시 버퍼 → 정식 거래 멱등 동기화 (FR-010)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                storeId: { type: integer }
+      responses:
+        "200":
+          description: 동기화 결과(반영/스킵 건수)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+
+  /external/{signalType}:
+    get:
+      tags: [external]
+      summary: 외부 신호 조회 (FR-011~013) — 중단 시 상태 표시
+      parameters:
+        - in: path
+          name: signalType
+          required: true
+          schema: { type: string, enum: [weather, trade-area, foot-traffic] }
+        - { in: query, name: storeId, schema: { type: integer } }
+      responses:
+        "200":
+          description: 외부 신호(또는 폴백 상태)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExternalSignalResponse" }
+
+  /dashboard/kpi:
+    get:
+      tags: [dashboard]
+      summary: KPI 통합 조회 (FR-014~015, SC-001~007)
+      parameters:
+        - { in: query, name: storeId, schema: { type: integer } }
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: SC-001~007 통합 스냅샷
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KpiSnapshot" }
+
+  /consent:
+    get:
+      tags: [consent]
+      summary: 동의 상태 조회 (FR-017)
+      parameters:
+        - { in: query, name: subjectRef, schema: { type: string }, description: 비식별 참조 }
+      responses:
+        "200":
+          description: 동의 상태
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Consent" }
+  /consent/check:
+    get:
+      tags: [consent]
+      summary: 데이터/결제 경로 진입 게이트 검사 (FR-007, FR-016~017)
+      parameters:
+        - { in: query, name: subjectRef, schema: { type: string } }
+        - { in: query, name: purpose, schema: { type: string, enum: [checkout, analytics, vision] } }
+      responses:
+        "200":
+          description: 통과 여부
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed: { type: boolean }
+                  reason: { type: string }
+
+components:
+  schemas:
+    ProductCodeMapping:
+      type: object
+      properties:
+        storeId: { type: integer }
+        rawCode: { type: string }
+        rawName: { type: string, nullable: true }
+        standardCode: { type: string, nullable: true }
+        status: { type: string, enum: [mapped, unmapped, review] }
+        matchMethod: { type: string, enum: [exact, rule, manual], nullable: true }
+        confidence: { type: number, nullable: true }
+    MappingUpsert:
+      type: object
+      required: [storeId, rawCode]
+      properties:
+        storeId: { type: integer }
+        rawCode: { type: string }
+        standardCode: { type: string, nullable: true, description: "null이면 미매핑 명시(추정 금지)" }
+    CoverageReport:
+      type: object
+      properties:
+        storeId: { type: integer, nullable: true }
+        total: { type: integer }
+        mapped: { type: integer }
+        unmapped: { type: integer }
+        coveragePct: { type: number, description: "mapped/total*100 (SC-006 목표 ≥95)" }
+        unmappedItems:
+          type: array
+          items: { type: object, properties: { rawCode: { type: string }, rawName: { type: string } } }
+    SelfCheckoutRequest:
+      type: object
+      required: [storeId, items, idempotencyKey]
+      properties:
+        storeId: { type: integer }
+        idempotencyKey: { type: string }
+        subjectRef: { type: string, nullable: true, description: 비식별 참조(선택) }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              standardCode: { type: string }
+              qty: { type: integer }
+    CheckoutResult:
+      type: object
+      properties:
+        transactionId: { type: integer }
+        amount: { type: integer }
+        waitMs: { type: integer, description: "결제 대기시간(SC-004 ≤10000)" }
+        outcome: { type: string, enum: [completed, abandoned] }
+    CheckoutMetrics:
+      type: object
+      properties:
+        count: { type: integer }
+        p95Ms: { type: integer }
+        avgMs: { type: integer }
+        withinSlaPct: { type: number, description: "10초 이내 비율" }
+    BufferedPayment:
+      type: object
+      properties:
+        idempotencyKey: { type: string }
+        storeId: { type: integer }
+        amount: { type: integer }
+        bufferedAt: { type: string, format: date-time }
+        syncStatus: { type: string, enum: [buffered, syncing, synced, failed] }
+    SyncResult:
+      type: object
+      properties:
+        applied: { type: integer }
+        skipped: { type: integer, description: "이미 synced(멱등) 스킵 건수" }
+        failed: { type: integer }
+    ExternalSignalResponse:
+      type: object
+      properties:
+        signalType: { type: string }
+        available: { type: boolean, description: "false면 폴백(FR-013)" }
+        source: { type: string, example: sim }
+        observedAt: { type: string, format: date-time, nullable: true }
+        value: { type: object, nullable: true }
+        fallback: { type: string, nullable: true, description: "데이터 없음/내부 폴백 사유" }
+    KpiSnapshot:
+      type: object
+      properties:
+        storeId: { type: integer, nullable: true }
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+        wasteReductionPct: { type: number, description: SC-001 }
+        revenueUpliftPct: { type: number, description: SC-002 }
+        forecastAccuracyPct: { type: number, description: SC-003 }
+        checkoutWaitP95Ms: { type: integer, description: SC-004 }
+        uptimePct: { type: number, description: SC-005 }
+        mappingCoveragePct: { type: number, description: SC-006 }
+        governanceCompliancePct: { type: number, description: SC-007 }
+    Consent:
+      type: object
+      properties:
+        subjectRef: { type: string }
+        status: { type: string, enum: [granted, revoked] }
+        updatedAt: { type: string, format: date-time }
