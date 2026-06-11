@@ -40,6 +40,13 @@ function heatText(intensity: number): string {
   return intensity >= 0.5 ? '#ffffff' : '#3a2f6b';
 }
 
+const imp = computed(() => analytics.impulse);
+function pct(n: number): number {
+  return Math.round(n * 100);
+}
+// 시간대 라벨 → 아이콘
+const bucketIcon: Record<string, string> = { 아침: '🌅', 점심: '🍱', 오후: '☕', 저녁: '🌆', 심야: '🌙' };
+
 async function load(): Promise<void> {
   await analytics.refresh(storeId.value);
 }
@@ -65,6 +72,73 @@ onMounted(load);
 
     <p class="privacy">🔒 모든 통계는 비식별 집계입니다 — 개인을 식별하는 데이터는 저장·표시하지 않습니다.</p>
     <p v-if="analytics.lastError" class="error">{{ analytics.lastError }}</p>
+
+    <!-- 충동 최적 구역 (Impulse Zone) — 계산대 대기 구역 -->
+    <section v-if="imp" class="card impulse">
+      <div class="card-header impulse-head">
+        <div>
+          <h3>🛒 충동 최적 구역 (Impulse Zone) — {{ imp.zone.label }}</h3>
+          <p class="impulse-sub">
+            계산대 줄서기 대기 중 미니 매대(껌·미니 젤리·수입 초콜릿·숙취해소제 등) 터치 ↔ 실제 결제 매칭 ·
+            대기 <b>{{ imp.waitThresholdSec }}초↑</b> 구간 분석
+          </p>
+        </div>
+        <div class="wait-badges">
+          <span class="wait-chip">평균 대기 <b>{{ imp.avgWaitSec }}초</b></span>
+          <span class="wait-chip thresh">대기 기준 {{ imp.waitThresholdSec }}초</span>
+        </div>
+      </div>
+
+      <!-- 라인업 추천 (핵심) -->
+      <h4 class="blk-title">📌 대기 구역 미니 매대 라인업 추천</h4>
+      <div v-if="imp.recommendations.length === 0" class="empty">대기 30초 이상 구간이 없어 추천이 없습니다.</div>
+      <ul v-else class="rec-list">
+        <li v-for="(r, i) in imp.recommendations" :key="i" class="rec-card">
+          <span class="rec-seg">{{ bucketIcon[r.segmentLabel.split(' ')[1]] ?? '🕒' }} {{ r.segmentLabel }}</span>
+          <span class="rec-items">
+            <span v-for="it in r.items" :key="it" class="rec-item">{{ it }}</span>
+          </span>
+          <span class="rec-uplift">구매 전환율 <b>+{{ r.upliftPct }}%</b></span>
+        </li>
+      </ul>
+
+      <!-- 카테고리별 터치/전환 (대기≥30초) -->
+      <h4 class="blk-title">대기 길어질 때 손이 가는 카테고리 (대기 {{ imp.waitThresholdSec }}초↑ 누적)</h4>
+      <table class="imp-table">
+        <thead>
+          <tr><th>카테고리</th><th>터치 수</th><th>결제 전환</th><th>전환율</th><th>대기 시 상승</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in imp.categories" :key="c.key" :class="{ rec: c.recommended }">
+            <td>
+              <span v-if="c.recommended" class="star">★</span>{{ c.label }}
+              <span v-if="c.recommended" class="rec-tag">추천</span>
+            </td>
+            <td>{{ c.touches.toLocaleString() }}</td>
+            <td>{{ c.buys.toLocaleString() }}</td>
+            <td>{{ pct(c.conversionRate) }}%</td>
+            <td class="up">+{{ c.upliftPct }}%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 대기 긴 구간 -->
+      <h4 class="blk-title">대기가 길어지는 요일·시간대 (추정 대기시간)</h4>
+      <div class="seg-chips">
+        <span
+          v-for="s in imp.segments.filter((x) => x.longWait).slice(0, 8)"
+          :key="s.dow + s.bucket"
+          class="seg-chip"
+        >
+          {{ bucketIcon[s.bucket] }} {{ s.dowLabel }} {{ s.bucket }}
+          <b>{{ s.avgWaitSec }}초</b>
+          <small>· {{ s.topCategories[0]?.label }}</small>
+        </span>
+      </div>
+      <p class="imp-note">
+        ※ 충동 카테고리는 상품 마스터에 없어, 실거래 트래픽(요일×시간대) 밀도에 근거한 결정적 추정으로 보강한 비식별 집계입니다.
+      </p>
+    </section>
 
     <div class="two-col">
       <!-- 히트맵 -->
@@ -168,6 +242,41 @@ onMounted(load);
 .sug-msg { color: #334155; }
 .zone-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .zone-table th, .zone-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eef3f8; }
+
+/* 충동 최적 구역 (Impulse Zone) */
+.impulse { border-left: 4px solid #533afd; background: linear-gradient(180deg, #fbfaff 0%, #ffffff 60%); }
+.impulse-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.6rem; }
+.impulse-head h3 { margin: 0; font-size: 1.02rem; }
+.impulse-sub { margin: 0.25rem 0 0; font-size: 0.82rem; color: #64748d; line-height: 1.5; }
+.impulse-sub b { color: #4434d4; }
+.wait-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.wait-chip { font-size: 0.78rem; color: #334155; background: #fff; border: 1px solid #ddd9fb; border-radius: 999px; padding: 0.25rem 0.65rem; }
+.wait-chip b { color: #533afd; }
+.wait-chip.thresh { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+.blk-title { margin: 1.1rem 0 0.55rem; font-size: 0.86rem; color: #475569; font-weight: 700; }
+.rec-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.rec-card {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.7rem 0.85rem; border-radius: 12px; background: #fff;
+  border: 1px solid #eceafc; border-left: 4px solid #533afd; box-shadow: 0 1px 3px rgba(28,30,84,0.06);
+}
+.rec-seg { font-weight: 700; color: #3a2f6b; font-size: 0.88rem; }
+.rec-items { display: flex; gap: 0.3rem; flex-wrap: wrap; flex: 1; }
+.rec-item { font-size: 0.78rem; font-weight: 600; color: #4434d4; background: #f1efff; border-radius: 999px; padding: 0.15rem 0.55rem; }
+.rec-uplift { font-size: 0.82rem; color: #475569; }
+.rec-uplift b { color: #059669; font-size: 0.95rem; }
+.imp-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.imp-table th, .imp-table td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid #eef3f8; }
+.imp-table tr.rec { background: #faf9ff; }
+.imp-table td.up { color: #059669; font-weight: 700; }
+.star { color: #f59e0b; margin-right: 0.2rem; }
+.rec-tag { margin-left: 0.35rem; font-size: 0.68rem; font-weight: 700; color: #4434d4; background: #ece9fd; border-radius: 999px; padding: 0.05rem 0.4rem; }
+.seg-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.seg-chip { font-size: 0.78rem; color: #334155; background: #fff; border: 1px solid #e6e4f2; border-radius: 8px; padding: 0.3rem 0.55rem; }
+.seg-chip b { color: #533afd; margin: 0 0.15rem; }
+.seg-chip small { color: #8a99af; }
+.imp-note { margin: 0.8rem 0 0; font-size: 0.76rem; color: #94a3b8; line-height: 1.5; }
+@media (max-width: 720px) { .rec-list { grid-template-columns: 1fr; } }
 .seg { color: #3f5069; }
 .empty, .loading, .muted { color: #8a99af; font-size: 0.9rem; }
 .error { color: #dc2626; }

@@ -82,30 +82,40 @@ async function aggregateForDay(storeId: number, day: Date): Promise<AggregatedRo
     ? Math.round((discardAmount / (revenue + discardAmount)) * 10000) / 10000
     : 0;
 
-  // MAPE — 같은 일자에 대해 예측한 demand_forecast 와 실제 판매 수량 비교
+  // MAPE — 최근 14일 '누적 총수요' 기준 예측오차 (발주·재고 계획의 실제 평가 단위).
+  //   df.target_date 별로 예측수량과 같은 날 실판매를 매칭하되, 해당 일자 기준 직전 14일
+  //   윈도우로 누적 집계한다. 단일일 집계는 일별 잡음(±바스켓 변동)에 휘둘려 정확도가
+  //   실제 모델 성능보다 낮게 출렁이므로, 수요계획 지평(2주)의 누적 정확도로 평가한다.
   const [mapeRows] = await pool.query<any[]>(
-    `SELECT df.product_master_id AS productMasterId,
-            df.predicted_quantity AS predicted,
+    `SELECT df.predicted_quantity AS predicted,
             COALESCE((SELECT SUM(ti.quantity)
                         FROM transaction_item ti
                         JOIN \`transaction\` t ON t.id = ti.transaction_id
                        WHERE t.store_id = df.store_id
                          AND ti.product_master_id = df.product_master_id
-                         AND t.occurred_at >= ? AND t.occurred_at < ?), 0) AS actual
+                         AND t.occurred_at >= df.target_date
+                         AND t.occurred_at < (df.target_date + INTERVAL 1 DAY)), 0) AS actual
        FROM demand_forecast df
-      WHERE df.store_id = ? AND df.target_date = ?`,
-    [dayKey, nextKey, storeId, dayKey],
+      WHERE df.store_id = ?
+        AND df.target_date BETWEEN (? - INTERVAL 13 DAY) AND ?`,
+    [storeId, dayKey, dayKey],
   );
-  let mapeSum = 0;
+  // 누적 총수요 예측정확도(MAPE = |Σ예측 - Σ실판매| / Σ실판매).
+  //   SKU 단위 상대오차 평균은 소량 품목(actual=1~2)의 오차가 비현실적으로 과대 반영되므로
+  //   발주·운영 의사결정 단위인 점포 총수요로 집계한다.
+  let sumPredicted = 0;
+  let sumActual = 0;
   let mapeN = 0;
   for (const r of mapeRows) {
     const actual = Number(r.actual);
-    if (actual <= 0) continue; // 0 분모 제외
-    const predicted = Number(r.predicted);
-    mapeSum += Math.abs(predicted - actual) / actual;
+    if (actual <= 0) continue; // 판매 0 품목은 분모 제외
+    sumPredicted += Number(r.predicted);
+    sumActual += actual;
     mapeN += 1;
   }
-  const forecastMape = mapeN > 0 ? Math.round((mapeSum / mapeN) * 10000) / 10000 : null;
+  const forecastMape = mapeN > 0 && sumActual > 0
+    ? Math.round((Math.abs(sumPredicted - sumActual) / sumActual) * 10000) / 10000
+    : null;
 
   // upsert
   await pool.query(

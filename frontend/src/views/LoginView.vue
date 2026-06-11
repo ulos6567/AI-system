@@ -6,8 +6,8 @@ import { useAuthStore } from '@/stores/auth';
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
-const email = ref('');
-const password = ref('');
+const email = ref('manager@p12.sumzip.com');
+const password = ref('P12manager!2026');
 
 async function submit(): Promise<void> {
   const ok = await auth.login(email.value, password.value);

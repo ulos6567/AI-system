@@ -5,12 +5,17 @@ import {
   type PrescriptiveAction,
   type OperationalSignal,
   type ActionOutcome,
+  type DailyBriefing,
+  type RoiSummary,
+  type MarkdownSimulation,
 } from '@/api/insights';
 
 export const useInsightsStore = defineStore('insights', () => {
   const actions = ref<PrescriptiveAction[]>([]);
   const signals = ref<OperationalSignal[]>([]);
   const outcomes = ref<Record<number, ActionOutcome>>({});
+  const briefing = ref<DailyBriefing | null>(null);
+  const roi = ref<RoiSummary | null>(null);
   const loading = ref(false);
   const lastError = ref<string | null>(null);
 
@@ -18,13 +23,33 @@ export const useInsightsStore = defineStore('insights', () => {
     loading.value = true;
     lastError.value = null;
     try {
-      const [a, s] = await Promise.all([insightsApi.actions(storeId), insightsApi.signals(storeId)]);
+      const [a, s, b] = await Promise.all([
+        insightsApi.actions(storeId),
+        insightsApi.signals(storeId),
+        insightsApi.briefing(storeId),
+      ]);
       actions.value = a.actions;
       signals.value = s.signals;
+      briefing.value = b.kpi;
+      roi.value = b.roi;
     } catch (err: any) {
       lastError.value = err?.message ?? 'failed';
     } finally {
       loading.value = false;
+    }
+  }
+
+  async function simulate(
+    storeId: number,
+    id: number,
+    percent: number,
+    durationHours: number,
+  ): Promise<MarkdownSimulation | null> {
+    try {
+      const r = await insightsApi.simulate(storeId, id, percent, durationHours);
+      return r.simulation;
+    } catch {
+      return null;
     }
   }
 
@@ -72,5 +97,19 @@ export const useInsightsStore = defineStore('insights', () => {
     }
   }
 
-  return { actions, signals, outcomes, loading, lastError, refresh, generate, approve, reject, loadOutcome };
+  return {
+    actions,
+    signals,
+    outcomes,
+    briefing,
+    roi,
+    loading,
+    lastError,
+    refresh,
+    generate,
+    approve,
+    reject,
+    loadOutcome,
+    simulate,
+  };
 });

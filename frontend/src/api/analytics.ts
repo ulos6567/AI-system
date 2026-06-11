@@ -29,9 +29,44 @@ export interface PlacementSuggestion {
   message: string;
 }
 
+export interface ImpulseCategoryStat {
+  key: string;
+  label: string;
+  touches: number;
+  buys: number;
+  conversionRate: number;
+  upliftPct: number;
+  recommended: boolean;
+}
+export interface ImpulseSegment {
+  dow: number;
+  dowLabel: string;
+  bucket: string;
+  traffic: number;
+  avgWaitSec: number;
+  longWait: boolean;
+  topCategories: { label: string; touches: number; conversionRate: number; upliftPct: number }[];
+}
+export interface ImpulseRecommendation {
+  segmentLabel: string;
+  items: string[];
+  upliftPct: number;
+  message: string;
+}
+export interface ImpulseZoneReport {
+  zone: { code: string; label: string };
+  waitThresholdSec: number;
+  avgWaitSec: number;
+  categories: ImpulseCategoryStat[];
+  segments: ImpulseSegment[];
+  recommendations: ImpulseRecommendation[];
+}
+
 export const analyticsApi = {
   heatmap: (storeId: number) =>
     api<{ storeId: number; date: string; cells: HeatmapCell[] }>(`/stores/${storeId}/analytics/heatmap`),
+  impulse: (storeId: number) =>
+    api<{ storeId: number } & ImpulseZoneReport>(`/stores/${storeId}/analytics/impulse`),
   insights: (storeId: number) =>
     api<{ storeId: number; zones: BehaviorZone[] }>(`/stores/${storeId}/analytics/insights`),
   suggestions: (storeId: number) =>

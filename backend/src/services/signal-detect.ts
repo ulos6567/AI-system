@@ -128,12 +128,65 @@ async function detectOverstock(storeId: number): Promise<DetectedSignal[]> {
   return out;
 }
 
+const SURGE_HORIZON_DAYS = 3;
+
+/**
+ * demand_surge : 점포 인근 대학의 진행중·임박(≤3일) 축제/시험 일정으로 학생 유동 급증 예측.
+ *   campus 캘린더(store_university ↔ academic_event)를 근거로 점포 단위 신호를 만든다.
+ *   가장 영향이 큰 일정 1건만 신호화(중복·과다 방지).
+ */
+async function detectDemandSurge(storeId: number): Promise<DetectedSignal[]> {
+  const pool = getPool();
+  const [rows] = await pool.query<any[]>(
+    `SELECT u.short_name AS uniShort, u.name AS uniName,
+            a.event_type AS eventType, a.title, a.peak_hours AS peakHours, a.traffic_level AS traffic,
+            a.start_date AS startDate, a.end_date AS endDate,
+            CASE WHEN CURRENT_DATE BETWEEN a.start_date AND a.end_date THEN 0
+                 ELSE DATEDIFF(a.start_date, CURRENT_DATE) END AS daysUntilStart
+       FROM academic_event a
+       JOIN store_university su ON su.university_id = a.university_id AND su.store_id = ?
+       JOIN university u ON u.id = a.university_id
+      WHERE a.event_type IN ('festival','exam')
+        AND a.end_date >= CURRENT_DATE
+        AND a.start_date <= DATE_ADD(CURRENT_DATE, INTERVAL ? DAY)
+      ORDER BY FIELD(a.traffic_level, 'peak', 'high', 'normal', 'low'), a.start_date ASC
+      LIMIT 1`,
+    [storeId, SURGE_HORIZON_DAYS],
+  );
+  if (!rows.length) return [];
+  const r = rows[0];
+  const isFest = r.eventType === 'festival';
+  return [
+    {
+      storeId,
+      signalType: 'demand_surge',
+      severity: r.traffic === 'peak' ? 5 : 4,
+      productId: null,
+      detectedAt: new Date(),
+      payload: {
+        university: r.uniShort ?? r.uniName,
+        eventType: r.eventType,
+        title: r.title,
+        peakHours: r.peakHours,
+        daysUntilStart: Number(r.daysUntilStart),
+        startDate: String(r.startDate).slice(0, 10),
+        endDate: String(r.endDate).slice(0, 10),
+        categories: isFest
+          ? ['beverage', 'snack', 'frozen', 'ricesnack']
+          : ['beverage', 'instant', 'lunchbox', 'snack'],
+        upliftPct: isFest ? 40 : 25,
+      },
+    },
+  ];
+}
+
 /** 한 점포의 신호를 탐지하여 반환(적재는 호출 측/prescription 서비스가 담당). */
 export async function detectSignals(storeId: number): Promise<DetectedSignal[]> {
-  const [waste, drop, over] = await Promise.all([
+  const [waste, drop, over, surge] = await Promise.all([
     detectWasteRisk(storeId),
     detectSalesDrop(storeId),
     detectOverstock(storeId),
+    detectDemandSurge(storeId),
   ]);
-  return [...waste, ...drop, ...over];
+  return [...waste, ...drop, ...over, ...surge];
 }

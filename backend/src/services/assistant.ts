@@ -69,6 +69,134 @@ interface Topic {
 }
 
 const won = (n: number): string => `${Math.round(n).toLocaleString('ko-KR')}원`;
+const ea = (n: number): string => `${Math.round(n).toLocaleString('ko-KR')}개`;
+
+/**
+ * 질문에서 원하는 순위 개수(N)를 추출한다.
+ *   "1-10", "1~10"(범위) → 상한값 / "TOP 10", "상위 10", "10위/개/가지/종" → 그 수.
+ *   못 찾으면 def. 1~cap 범위로 보정.
+ */
+function parseTopN(message: string, def: number, cap = 20): number {
+  let m = message.match(/\b\d{1,2}\s*[-~]\s*(\d{1,2})\b/); // "1-10" → 10
+  if (!m) m = message.match(/(?:top|상위|순위|베스트|best)\s*(\d{1,2})/i);
+  if (!m) m = message.match(/(\d{1,2})\s*(?:위|개|가지|종)\b/);
+  let n = m ? parseInt(m[1], 10) : def;
+  if (!Number.isFinite(n) || n <= 0) n = def;
+  return Math.min(cap, Math.max(1, n));
+}
+
+/**
+ * 질문에서 판매 집계 기간을 판별한다(과거 실적 기준).
+ *   지난달 / 이번 달(=이번 한 달·당월·한 달) / 최근 30일 / 기본 최근 7일.
+ *   반환 sql 은 고정 화이트리스트 문자열(사용자 입력 미포함)이라 인젝션 안전.
+ */
+function salesPeriod(message: string): { sql: string; label: string; period: string } {
+  if (/(지난\s*달|지난달|전월|저번\s*달|작\s*월)/.test(message))
+    return {
+      sql: 'YEAR(t.occurred_at)=YEAR(DATE_SUB(CURRENT_DATE,INTERVAL 1 MONTH)) AND MONTH(t.occurred_at)=MONTH(DATE_SUB(CURRENT_DATE,INTERVAL 1 MONTH))',
+      label: '지난달',
+      period: 'last_month',
+    };
+  if (/(이번\s*한?\s*달|당월|이달|금월|한\s*달|월간|월\s*매출|이번\s*달)/.test(message))
+    return {
+      sql: 'YEAR(t.occurred_at)=YEAR(CURRENT_DATE) AND MONTH(t.occurred_at)=MONTH(CURRENT_DATE)',
+      label: '이번 달',
+      period: 'this_month',
+    };
+  if (/(최근\s*30|30\s*일|한\s*달간)/.test(message))
+    return { sql: 't.occurred_at >= DATE_SUB(CURRENT_DATE,INTERVAL 30 DAY)', label: '최근 30일', period: 'last_30_days' };
+  return { sql: 't.occurred_at >= DATE_SUB(CURRENT_DATE,INTERVAL 7 DAY)', label: '최근 7일', period: 'last_7_days' };
+}
+
+/**
+ * 다음 달 최다 판매 예측 — 전용 예측 데이터가 없으므로 최근 5주 판매 실적의
+ * '요일별' 평균을 다음 달의 실제 요일 구성(평일/주말 일수)에 투영해 품목별
+ * 예상 판매량·예상 매출을 산출한다. 작년 동월 데이터가 없어 계절성은 미반영(추정치).
+ */
+async function forecastNextMonth(
+  storeId: number,
+  message: string,
+): Promise<{ facts: string[]; sources: GroundingSource[] }> {
+  const pool = getPool();
+  const n = parseTopN(message, 10);
+
+  // 상품 × 요일(DAYOFWEEK 1=일~7=토)별 판매량·관측일수·매출
+  const [rows] = await pool.query<any[]>(
+    `SELECT ti.product_master_id AS pid, pm.name AS name,
+            DAYOFWEEK(t.occurred_at) AS dow,
+            SUM(ti.quantity) AS units,
+            COUNT(DISTINCT DATE(t.occurred_at)) AS days,
+            SUM(ti.quantity*ti.unit_price - ti.discount_applied) AS rev
+       FROM \`transaction\` t
+       JOIN transaction_item ti ON ti.transaction_id = t.id
+       JOIN product_master pm ON pm.id = ti.product_master_id
+      WHERE t.store_id=? AND t.occurred_at >= DATE_SUB(CURRENT_DATE,INTERVAL 35 DAY)
+      GROUP BY ti.product_master_id, pm.name, DAYOFWEEK(t.occurred_at)`,
+    [storeId],
+  );
+  if (!rows.length) return { facts: [], sources: [] };
+
+  const [meta] = await pool.query<any[]>(
+    `SELECT DATE_FORMAT(DATE_ADD(CURRENT_DATE,INTERVAL 1 MONTH),'%Y-%m-01') AS firstDay,
+            DAY(LAST_DAY(DATE_ADD(CURRENT_DATE,INTERVAL 1 MONTH))) AS days,
+            DATE_FORMAT(DATE_ADD(CURRENT_DATE,INTERVAL 1 MONTH),'%Y년 %c월') AS label`,
+  );
+  const nextDays = Number(meta[0]?.days ?? 30);
+  const nextLabel = String(meta[0]?.label ?? '다음 달');
+  const firstDay = String(meta[0]?.firstDay ?? '');
+
+  // 다음 달의 요일 구성 집계 (DAYOFWEEK 기준 1=일~7=토)
+  const dowCount: Record<number, number> = {};
+  let weekendDays = 0;
+  if (firstDay) {
+    const [y, mo] = firstDay.split('-').map(Number);
+    for (let d = 1; d <= nextDays; d++) {
+      const dow = new Date(y, mo - 1, d).getDay() + 1; // JS 0=일 → 1=일
+      dowCount[dow] = (dowCount[dow] ?? 0) + 1;
+      if (dow === 1 || dow === 7) weekendDays++;
+    }
+  }
+
+  // 상품별 요일 평균(1일당 판매량) + 전체 평균/평균단가 집계
+  const prod = new Map<number, { name: string; perDow: Map<number, number>; units: number; rev: number; days: number }>();
+  for (const r of rows) {
+    const pid = Number(r.pid);
+    let p = prod.get(pid);
+    if (!p) { p = { name: String(r.name), perDow: new Map(), units: 0, rev: 0, days: 0 }; prod.set(pid, p); }
+    const obs = Math.max(1, Number(r.days));
+    p.perDow.set(Number(r.dow), Number(r.units) / obs); // 해당 요일 1일 평균
+    p.units += Number(r.units);
+    p.rev += Number(r.rev);
+    p.days += Number(r.days);
+  }
+
+  const projected = [...prod.values()]
+    .map((p) => {
+      const overallPerDay = p.days > 0 ? p.units / p.days : 0; // 요일 데이터 공백 시 보완값
+      const avgPrice = p.units > 0 ? p.rev / p.units : 0;
+      let predUnits = 0;
+      for (const [dowStr, cnt] of Object.entries(dowCount)) {
+        const dow = Number(dowStr);
+        predUnits += (p.perDow.get(dow) ?? overallPerDay) * cnt;
+      }
+      predUnits = Math.round(predUnits);
+      return { name: p.name, predUnits, predRev: Math.round(predUnits * avgPrice) };
+    })
+    .sort((a, b) => b.predUnits - a.predUnits)
+    .slice(0, n);
+
+  const totU = projected.reduce((s, r) => s + r.predUnits, 0);
+  const totR = projected.reduce((s, r) => s + r.predRev, 0);
+  const facts = [
+    `${nextLabel} 최다 판매 예측 상위 ${projected.length}개 (최근 5주 요일별 추세를 다음 달 요일구성[총 ${nextDays}일·주말 ${weekendDays}일]에 투영):`,
+  ];
+  projected.forEach((r, i) =>
+    facts.push(`  ${i + 1}. ${r.name} — 예상 ${ea(r.predUnits)} (예상 매출 ${won(r.predRev)})`),
+  );
+  facts.push(`  └ 상위 ${projected.length}개 예상 합계: ${ea(totU)} · ${won(totR)}`);
+  facts.push('  ※ 요일·주말 패턴을 반영한 추세 투영 추정치입니다(작년 동월 데이터가 쌓이면 계절성까지 반영해 정밀도를 높일 수 있습니다).');
+  return { facts, sources: [{ type: 'demand_forecast', period: 'next_month', detail: '다음 달 판매 예측(요일 가중 투영)' }] };
+}
 
 const TOPICS: Topic[] = [
   // 오늘 매출 / 거래 건수 / 객단가
@@ -242,25 +370,33 @@ const TOPICS: Topic[] = [
       return { facts, sources: [{ type: 'transaction', period: 'last_7_days', detail: '시간대별 거래' }] };
     },
   },
-  // 오늘 상위 판매 상품
+  // 기간별 상위 판매 상품 순위 (요청 기간·개수 인식, 수량+매출)
   {
     intent: 'top_seller',
     test: /(최다|많이\s*팔|베스트|잘\s*팔|인기|top|상위).*(판매|상품|제품|메뉴)?|판매\s*(순위|상위|랭킹)/,
-    run: async (storeId) => {
+    run: async (storeId, message) => {
       const pool = getPool();
+      const n = parseTopN(message, 5); // 기본 5, "1-10"/"상위 10" 등 요청 시 그 수
+      const p = salesPeriod(message); // 이번 달 / 지난달 / 최근 30일 / 기본 7일
       const [rows] = await pool.query<any[]>(
-        `SELECT pm.name AS name, SUM(ti.quantity) AS units
+        `SELECT pm.name AS name, SUM(ti.quantity) AS units,
+                SUM(ti.quantity*ti.unit_price - ti.discount_applied) AS rev
            FROM \`transaction\` t
            JOIN transaction_item ti ON ti.transaction_id = t.id
            JOIN product_master pm ON pm.id = ti.product_master_id
-          WHERE t.store_id=? AND t.occurred_at >= DATE_SUB(CURRENT_DATE,INTERVAL 7 DAY)
-          GROUP BY ti.product_master_id, pm.name ORDER BY units DESC LIMIT 5`,
+          WHERE t.store_id=? AND ${p.sql}
+          GROUP BY ti.product_master_id, pm.name ORDER BY units DESC LIMIT ${n}`,
         [storeId],
       );
       if (!rows.length) return { facts: [], sources: [] };
-      const facts = ['최근 7일 판매 상위 상품:'];
-      rows.forEach((r, i) => facts.push(`  ${i + 1}. ${r.name} — ${Number(r.units)}개`));
-      return { facts, sources: [{ type: 'transaction', period: 'last_7_days', detail: '품목별 판매량' }] };
+      const totUnits = rows.reduce((s, r) => s + Number(r.units), 0);
+      const totRev = rows.reduce((s, r) => s + Number(r.rev), 0);
+      const facts = [`${p.label} 판매 상위 ${rows.length}개 상품 (판매수량·매출):`];
+      rows.forEach((r, i) =>
+        facts.push(`  ${i + 1}. ${r.name} — ${ea(Number(r.units))} (매출 ${won(Number(r.rev))})`),
+      );
+      facts.push(`  └ 상위 ${rows.length}개 합계: ${ea(totUnits)} · ${won(totRev)}`);
+      return { facts, sources: [{ type: 'transaction', period: p.period, detail: `${p.label} 품목별 판매량·매출` }] };
     },
   },
   // 안 팔리는 상품
@@ -330,6 +466,10 @@ const TOPICS: Topic[] = [
     intent: 'forecast',
     test: /(예측|수요|내일|주문량|발주량|얼마나\s*(시켜|들여)|forecast)/,
     run: async (storeId, message) => {
+      // "다음 달" 판매 예측은 내일 발주 예측과 별개 — 추세 투영으로 월간 순위 예측
+      if (/(다음\s*달|다음달|내달|담\s*달|익월|차월|next\s*month)/.test(message)) {
+        return forecastNextMonth(storeId, message);
+      }
       const pool = getPool();
       const [rows] = await pool.query<any[]>(
         `SELECT pm.name AS name, df.predicted_quantity AS qty, df.confidence AS conf
@@ -678,6 +818,21 @@ async function insertMessage(
   return res.insertId as number;
 }
 
+/**
+ * AI 점포 매니저 어시스턴트 전용 답변 스타일 지시.
+ * 실 LLM(ADAPTER_LLM=openai) 전환 시 혼합 질문(예: 이번 달 순위 + 다음 달 예측)을
+ * 자연스러운 한국어로 매끄럽게 요약하도록 유도한다. mock 어댑터는 system 메시지를 무시한다.
+ */
+const ASSISTANT_STYLE =
+  '당신은 점주를 돕는 AI 점포 매니저입니다. [운영 데이터]의 수치만 근거로 답하되, ' +
+  '다음 규칙을 지키세요. ' +
+  '① 질문에 여러 주제(예: 이번 달 판매 순위 + 다음 달 예측)가 섞여 있으면 각 주제를 ' +
+  '소제목으로 나눠 빠짐없이 다룹니다. ' +
+  '② 먼저 한두 문장으로 핵심 인사이트를 요약한 뒤, 순위·수치는 목록으로 제시합니다. ' +
+  '③ 판매수량과 매출 등 숫자는 데이터에 있는 값만 그대로 인용하고 임의로 만들지 않습니다. ' +
+  '④ 예측·추정 수치에는 추정임을 한 줄로 함께 안내합니다. ' +
+  '⑤ 데이터에 없으면 "데이터 없음"이라고 말합니다.';
+
 /** 질의 처리: 근거 조회 → LLM(or 폴백) → 응답 저장 + 감사(assistant_query). */
 export async function ask(storeId: number, userId: number | null, message: string, conversationId?: number): Promise<AssistantAnswer> {
   const convId = await ensureConversation(storeId, userId, conversationId);
@@ -693,9 +848,13 @@ export async function ask(storeId: number, userId: number | null, message: strin
   } else {
     const llm = getLlmAdapter();
     const result = await llm.complete({
-      messages: [{ role: 'user', content: message }],
+      // 어시스턴트 전용 답변 스타일 지시(실 LLM에서만 반영, mock 어댑터는 무시).
+      messages: [
+        { role: 'system', content: ASSISTANT_STYLE },
+        { role: 'user', content: message },
+      ],
       groundingContext: grounding.facts.join('\n'),
-      maxTokens: 512,
+      maxTokens: grounding.intent === 'multi' ? 900 : 512,
     });
     content = result.content;
     model = result.model;

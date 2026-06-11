@@ -21,6 +21,9 @@ import {
   approveAction,
   rejectAction,
   getOutcome,
+  getBriefing,
+  getRoi,
+  simulateAction,
 } from '../services/prescription';
 
 const router = Router({ mergeParams: true });
@@ -28,6 +31,21 @@ const router = Router({ mergeParams: true });
 function currentUser(req: Request): SessionUser | undefined {
   return req.session?.user ?? (req as any).jwtUser;
 }
+
+// 오늘의 운영 브리핑(KPI 헤더) + 처방 효과 ROI 롤업
+router.get('/briefing', requireAuth, requireStoreScope(), async (req, res) => {
+  const storeId = Number(req.params.storeId);
+  const [kpi, roi] = await Promise.all([getBriefing(storeId), getRoi(storeId)]);
+  res.json({ storeId, kpi, roi });
+});
+
+// 가격 인하 처방 What-if 시뮬레이션 (인하율·기간별 예상 효과)
+router.get('/actions/:id/simulate', requireAuth, requireStoreScope(), async (req, res) => {
+  const id = Number(req.params.id);
+  const percent = Math.min(90, Math.max(1, Number(req.query.percent ?? 20)));
+  const durationHours = Math.min(72, Math.max(1, Number(req.query.durationHours ?? 6)));
+  res.json({ actionId: id, simulation: await simulateAction(id, percent, durationHours) });
+});
 
 router.get('/signals', requireAuth, requireStoreScope(), async (req, res) => {
   const storeId = Number(req.params.storeId);

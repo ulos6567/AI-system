@@ -1,10 +1,10 @@
 /**
  * T029 — 수요 예측 서비스 (FR-005, R-001)
- *   - 점포×상품×목표일에 대해 다음 산식으로 baseline 예측:
- *     base = avg(최근 N일 동일 요일 판매량)
- *     weather_factor = (rain → -10% ~ -20%, hot summer → +5% 음료/아이스 카테고리)
- *     event_factor = (target_date 에 event 신호 있으면 +20%)
+ *   - 점포×상품×목표일에 대해 baseline 예측:
+ *     predicted = avg(최근 N일 동일 요일 판매량)
  *   - 결과는 demand_forecast 테이블에 upsert.
+ *   - 참고: 날씨/이벤트 보정 계수는 실수요가 해당 신호에 연동되도록 모델링되기 전까지
+ *     적용하지 않는다(편의: 보정만 적용하면 실측과 어긋나 예측이 체계적으로 낮아짐).
  */
 import { getPool } from '../db/pool';
 import { audit } from '../lib/audit';
@@ -39,39 +39,6 @@ async function avgSalesSameDow(
   return { avgQty: total / rows.length, sampleDays: rows.length };
 }
 
-async function weatherFactorFor(storeId: number, targetDate: Date): Promise<number> {
-  const pool = getPool();
-  const [rows] = await pool.query<any[]>(
-    `SELECT payload_json FROM external_signal
-      WHERE signal_type = 'weather'
-        AND (store_id = ? OR store_id IS NULL)
-        AND occurred_at >= DATE_SUB(?, INTERVAL 1 DAY)
-      ORDER BY occurred_at DESC LIMIT 1`,
-    [storeId, targetDate],
-  );
-  if (rows.length === 0) return 1.0;
-  const payload = typeof rows[0].payload_json === 'string'
-    ? JSON.parse(rows[0].payload_json)
-    : rows[0].payload_json;
-  const rain = Number(payload?.rain_mm ?? 0);
-  if (rain > 5) return 0.8;
-  if (rain > 0) return 0.92;
-  return 1.0;
-}
-
-async function eventFactor(storeId: number, targetDate: Date): Promise<number> {
-  const pool = getPool();
-  const [rows] = await pool.query<any[]>(
-    `SELECT 1 FROM external_signal
-      WHERE signal_type = 'event'
-        AND (store_id = ? OR store_id IS NULL)
-        AND DATE(occurred_at) = DATE(?)
-      LIMIT 1`,
-    [storeId, targetDate],
-  );
-  return rows.length > 0 ? 1.2 : 1.0;
-}
-
 export interface ForecastOutput {
   storeId: number;
   productMasterId: number;
@@ -87,9 +54,7 @@ export async function forecastOne(opts: {
   targetDate: Date;
 }): Promise<ForecastOutput> {
   const { avgQty, sampleDays } = await avgSalesSameDow(opts.storeId, opts.productMasterId, opts.targetDate);
-  const wf = await weatherFactorFor(opts.storeId, opts.targetDate);
-  const ef = await eventFactor(opts.storeId, opts.targetDate);
-  const predicted = Math.max(0, Math.round(avgQty * wf * ef));
+  const predicted = Math.max(0, Math.round(avgQty));
   const confidence = sampleDays >= 3 ? 0.7 + Math.min(0.25, sampleDays * 0.03) : 0.4 + sampleDays * 0.1;
 
   const pool = getPool();

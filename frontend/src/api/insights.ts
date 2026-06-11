@@ -40,7 +40,53 @@ export interface ActionOutcome {
   verifiedAt: string | null;
 }
 
+export interface DailyBriefing {
+  todayRevenue: number;
+  todayTx: number;
+  avgTicket: number;
+  vsYesterdayPct: number | null;
+  vsLastWeekPct: number | null;
+  projectedClose: number;
+  openSignals: number;
+  proposedActions: number;
+  wasteRiskAmount: number;
+  wasteRiskItems: number;
+  wasteRiskUnits: number;
+}
+
+export interface RoiSummary {
+  period: string;
+  executed: number;
+  verified: number;
+  hits: number;
+  hitRate: number | null;
+  estValueWon: number;
+  addedUnits: number;
+}
+
+export interface MarkdownSimulation {
+  applicable: boolean;
+  percent?: number;
+  durationHours?: number;
+  currentQty?: number;
+  unitPrice?: number;
+  adjustedPrice?: number;
+  dailyUnits?: number;
+  projectedDailyUnits?: number;
+  projectedUpliftPct?: number;
+  daysToSellOut?: number | null;
+  unitsInWindow?: number;
+  revenueInWindow?: number;
+  discountCost?: number;
+}
+
 export const insightsApi = {
+  briefing: (storeId: number) =>
+    api<{ storeId: number; kpi: DailyBriefing; roi: RoiSummary }>(`/stores/${storeId}/insights/briefing`),
+  simulate: (storeId: number, id: number, percent: number, durationHours: number) =>
+    api<{ actionId: number; simulation: MarkdownSimulation }>(
+      `/stores/${storeId}/insights/actions/${id}/simulate?percent=${percent}&durationHours=${durationHours}`,
+    ),
   signals: (storeId: number, status?: string) =>
     api<{ storeId: number; signals: OperationalSignal[] }>(
       `/stores/${storeId}/insights/signals${status ? `?status=${status}` : ''}`,

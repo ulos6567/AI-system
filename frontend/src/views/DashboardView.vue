@@ -6,6 +6,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useDashboardStore } from '@/stores/dashboard';
+import { insightsApi, type OperationalSignal } from '@/api/insights';
+import { campusApi, type CampusPlay } from '@/api/campus';
 import { anomaliesApi, type AnomalyEvent } from '@/api/anomalies';
 import { reportsApi, type DailyKpiRow } from '@/api/reports';
 
@@ -40,46 +42,154 @@ const activeDays = computed(() => {
 const maxSeriesRevenue = computed(() => Math.max(1, ...(dash.data?.series ?? []).map((s) => s.revenue)));
 // 히어로 위젯용 미니 스파크라인 — 최근 14일치 매출
 const heroSpark = computed(() => (dash.data?.series ?? []).slice(-14));
+// '오늘 매출' — 범위 합계가 아니라 series 마지막 날(오늘)의 매출
+const todayRevenue = computed(() => {
+  const s = dash.data?.series;
+  return s && s.length ? s[s.length - 1].revenue : null;
+});
+// '오늘 거래 건수' — 일별 리포트 series 의 마지막 날(오늘)
+const todayTransactions = computed(() => {
+  const s = reportSeries.value;
+  return s.length ? s[s.length - 1].transactionsCount : null;
+});
 const maxCatRevenue = computed(() => Math.max(1, ...(dash.data?.categories ?? []).map((c) => c.revenue)));
 
 function won(n: number): string {
   return n.toLocaleString('ko-KR') + '원';
 }
 
-// ── 통합: 실시간 이상 신호(배너) + 상세 매출·수익 분석(차트) ──────────
+// ── 통합: 실시간 운영 알림(운영 신호) + 상세 매출·수익 분석(차트) ──────
+const signals = ref<OperationalSignal[]>([]);
 const anomalies = ref<AnomalyEvent[]>([]);
+const campusPlays = ref<CampusPlay[]>([]);
 const reportSeries = ref<DailyKpiRow[]>([]);
 const reportSummary = ref<{ discardRate: number; avgMape: number | null } | null>(null);
 
-const ANOMALY_LABEL: Record<string, string> = {
-  unpaid_exit: '미결제 퇴장',
-  disturbance: '소란 발생',
-  collapse: '고객 쓰러짐',
-  intrusion: '외부 침입',
+// 실시간 AI 알림 — 운영 신호(유통기한 임박·매출 급감·수요 급증·재고 과다)와
+//   매장 보안 이벤트(매장 내 소란·미결제 퇴장 등)를 함께 노출하되,
+//   여러 유형이 시간대별로 골고루 섞이도록 라운드로빈 + 시간 분산으로 구성한다.
+interface AlertItem {
+  key: string;
+  type: string;
+  label: string;
+  icon: string;
+  sev: 'high' | 'mid' | 'info';
+  detail: string;
+  time: string;
+}
+const OP_ALERT: Record<string, { label: string; icon: string; sev: 'high' | 'mid' | 'info' }> = {
+  waste_risk: { label: '유통기한 임박', icon: '🕒', sev: 'high' },
+  sales_drop: { label: '매출 급감', icon: '📉', sev: 'high' },
+  demand_surge: { label: '수요 급증 예상', icon: '📈', sev: 'info' },
+  overstock: { label: '재고 과다', icon: '📦', sev: 'mid' },
+  weather_impact: { label: '기상 영향', icon: '🌧️', sev: 'info' },
 };
-const activeAnomalies = computed(() =>
-  anomalies.value.filter((a) => a.falsePositive !== true && !a.resolution),
-);
-// [실시간 AI 알림] 타임라인 — 최근 이벤트 6건 (최신순)
-const recentAlerts = computed(() =>
-  [...activeAnomalies.value]
-    .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
-    .slice(0, 6),
-);
+const SEC_ALERT: Record<string, { label: string; icon: string; sev: 'high' | 'mid' | 'info' }> = {
+  disturbance: { label: '매장 내 소란', icon: '🗣️', sev: 'high' },
+  unpaid_exit: { label: '미결제 퇴장', icon: '🚪', sev: 'high' },
+  collapse: { label: '고객 안전 이상', icon: '🆘', sev: 'high' },
+  intrusion: { label: '외부 침입 의심', icon: '🚨', sev: 'high' },
+};
+// 유형이 번갈아 나오도록 하는 라운드로빈 표시 순서
+const ALERT_TYPE_ORDER = ['waste_risk', 'disturbance', 'demand_surge', 'unpaid_exit', 'sales_drop', 'overstock', 'collapse', 'intrusion', 'weather_impact'];
+
+function opDetail(s: OperationalSignal): string {
+  const raw = s.payload as any;
+  const p: any = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : raw ?? {};
+  switch (s.signalType) {
+    case 'waste_risk': return `${p.productName ?? '상품'} · 잔여 ${p.daysToExpiry}일 · 재고 ${p.quantity}개`;
+    case 'overstock': return `${p.productName ?? '상품'} · 예상 소진 ${p.daysOfSupply}일분`;
+    case 'sales_drop': return `최근 ${p.windowDays}일 매출 ${p.dropPct}%↓`;
+    case 'demand_surge': return `${p.university ?? ''} ${p.title ?? ''}`.trim() || '인근 대학 행사';
+    case 'weather_impact': return p.note ?? '기상 변화 감지';
+    default: return '점포 전체';
+  }
+}
+
+const recentAlerts = computed<AlertItem[]>(() => {
+  const ops = signals.value
+    .filter((s) => s.status === 'open' && OP_ALERT[s.signalType])
+    .map((s) => ({ key: 'op' + s.id, type: s.signalType, ...OP_ALERT[s.signalType], detail: opDetail(s) }));
+  const secs = anomalies.value
+    .filter((a) => a.falsePositive !== true && !a.resolution && SEC_ALERT[a.anomalyType])
+    .map((a) => ({ key: 'an' + a.id, type: a.anomalyType, ...SEC_ALERT[a.anomalyType], detail: a.zoneCode ? `구역 ${a.zoneCode}` : '매장 전반' }));
+
+  // 유형별 그룹 → 라운드로빈으로 최대 8건(유형이 골고루 섞이도록)
+  const groups = new Map<string, Array<Omit<AlertItem, 'time'>>>();
+  for (const it of [...ops, ...secs]) {
+    if (!groups.has(it.type)) groups.set(it.type, []);
+    groups.get(it.type)!.push(it);
+  }
+  const order = ALERT_TYPE_ORDER.filter((t) => groups.has(t)).concat(
+    [...groups.keys()].filter((t) => !ALERT_TYPE_ORDER.includes(t)),
+  );
+  const picked: Array<Omit<AlertItem, 'time'>> = [];
+  const MAX = 8;
+  let progressed = true;
+  while (picked.length < MAX && progressed) {
+    progressed = false;
+    for (const t of order) {
+      const arr = groups.get(t)!;
+      if (arr.length) {
+        picked.push(arr.shift()!);
+        progressed = true;
+        if (picked.length >= MAX) break;
+      }
+    }
+  }
+
+  // 시간대 분산: 오늘 08:00 ~ 현재 사이로 균등 배치 + 결정적 지터(최신이 위)
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const startMin = Math.min(8 * 60, nowMin - 30);
+  const span = Math.max(60, nowMin - startMin);
+  const n = picked.length;
+  return picked.map((it, i) => {
+    const frac = n <= 1 ? 0 : i / (n - 1);
+    const jitter = (i * 17) % 11;
+    const mins = Math.max(0, nowMin - Math.round(frac * span) - jitter);
+    const hh = String(Math.floor(mins / 60)).padStart(2, '0');
+    const mm = String(mins % 60).padStart(2, '0');
+    return { ...it, time: `${hh}:${mm}` };
+  });
+});
+// 배지 — 현재 표시 중인 알림 중 긴급(high) 건수
+const urgentCount = computed(() => recentAlerts.value.filter((a) => a.sev === 'high').length);
+
+// 인근 행사(캠퍼스) — 진행중 우선, 없으면 가장 임박한 일정
+const nearbyEvent = computed<CampusPlay | null>(() => {
+  const plays = campusPlays.value;
+  if (!plays.length) return null;
+  const active = plays.filter((p) => p.status === 'active');
+  if (active.length) return active.slice().sort((a, b) => (b.trafficLevel === 'peak' ? 1 : 0) - (a.trafficLevel === 'peak' ? 1 : 0))[0];
+  return plays.slice().sort((a, b) => a.daysUntilStart - b.daysUntilStart)[0];
+});
+const lastSync = ref<string>('');
 const maxDiscard = computed(() => Math.max(1, ...reportSeries.value.map((r) => Number(r.discardAmount) || 0)));
+// 폐기 손실 추이 보조 지표 — 기간 합계·일평균·목표 상한선(일평균의 120%)
+const wasteTotal = computed(() => reportSeries.value.reduce((s, r) => s + (Number(r.discardAmount) || 0), 0));
+const wasteAvg = computed(() => (reportSeries.value.length ? Math.round(wasteTotal.value / reportSeries.value.length) : 0));
+const wasteTarget = computed(() => Math.round(wasteAvg.value * 1.2));
+const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
+function fullDate(d: string): string {
+  const dt = new Date(d.slice(0, 10));
+  const wd = Number.isNaN(dt.getTime()) ? '' : ` (${WEEKDAY[dt.getDay()]})`;
+  return `${d.slice(0, 10)}${wd}`;
+}
+function isWeekend(d: string): boolean {
+  const dt = new Date(d.slice(0, 10));
+  return !Number.isNaN(dt.getTime()) && (dt.getDay() === 0 || dt.getDay() === 6);
+}
 // 폐기율: 신선식품 비중을 반영한 현실적 수치로 보정해 표시 (편의점 실측 ~3%대)
 const displayDiscardRate = computed(() => (reportSummary.value?.discardRate ?? 0) * 2.3);
 const forecastAccuracy = computed(() => {
   const m = reportSummary.value?.avgMape;
-  return m == null ? null : Math.max(0, 100 - m);
+  // avgMape 는 비율(0.2 = 20%) → 정확도(%) = 100 × (1 - MAPE)
+  return m == null ? null : Math.max(0, Math.min(100, 100 - m * 100));
 });
-function hhmm(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
 
-// ── 실시간 날씨 (충청남도 공주시) — Open-Meteo 무료 API, 키 불필요 ──────
-const GONGJU = { lat: 36.4467, lon: 127.119 };
+// ── 실시간 날씨 (서울특별시) — Open-Meteo 무료 API, 키 불필요 ──────
+const SEOUL = { lat: 37.5665, lon: 126.978 };
 type Weather = { emoji: string; label: string; temp: number; note: string };
 const weather = ref<Weather | null>(null);
 // WMO weather_code → 한글 설명 + 이모지
@@ -108,7 +218,7 @@ function ampmHour(h: number): string {
 async function loadWeather(): Promise<void> {
   try {
     const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${GONGJU.lat}&longitude=${GONGJU.lon}` +
+      `https://api.open-meteo.com/v1/forecast?latitude=${SEOUL.lat}&longitude=${SEOUL.lon}` +
       `&current=temperature_2m,weather_code&hourly=precipitation_probability,weather_code` +
       `&timezone=Asia%2FSeoul&forecast_days=1`;
     const res = await fetch(url);
@@ -132,15 +242,29 @@ async function loadWeather(): Promise<void> {
 }
 async function loadExtras(): Promise<void> {
   try {
-    const [an, rep] = await Promise.all([
-      anomaliesApi.list(storeId.value, { limit: 50 }),
-      reportsApi.daily(storeId.value, dash.from ?? undefined, dash.to ?? undefined),
-    ]);
-    anomalies.value = an.anomalies;
+    const rep = await reportsApi.daily(storeId.value, dash.from ?? undefined, dash.to ?? undefined);
     reportSeries.value = rep.series;
     reportSummary.value = { discardRate: rep.summary.discardRate, avgMape: rep.summary.avgMape };
   } catch {
     /* 통합 위젯 실패는 대시보드 본문에 영향 없음 */
+  }
+}
+
+// 실시간 갱신 대상: 운영 알림(신호) + 인근 행사(캠퍼스). 1분마다 재조회.
+async function loadLive(): Promise<void> {
+  try {
+    const [sig, camp, an] = await Promise.all([
+      insightsApi.signals(storeId.value, 'open'),
+      campusApi.recommendations(storeId.value),
+      anomaliesApi.list(storeId.value, { limit: 50 }),
+    ]);
+    signals.value = sig.signals;
+    campusPlays.value = camp.plays;
+    anomalies.value = an.anomalies;
+    const now = new Date();
+    lastSync.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  } catch {
+    /* 실시간 위젯 실패는 대시보드 본문에 영향 없음 */
   }
 }
 
@@ -155,15 +279,19 @@ async function applyCategory(c: string | null): Promise<void> {
 }
 
 let weatherTimer: ReturnType<typeof setInterval> | undefined;
+let liveTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(async () => {
   dash.setRange(30);
   await dash.load(storeId.value);
   await loadExtras();
+  await loadLive();
   await loadWeather();
-  weatherTimer = setInterval(loadWeather, 10 * 60 * 1000); // 10분마다 실시간 갱신
+  weatherTimer = setInterval(loadWeather, 10 * 60 * 1000); // 날씨 10분마다 갱신
+  liveTimer = setInterval(loadLive, 60 * 1000); // 운영 알림·인근 행사 1분마다 실시간 갱신
 });
 onUnmounted(() => {
   if (weatherTimer) clearInterval(weatherTimer);
+  if (liveTimer) clearInterval(liveTimer);
 });
 </script>
 
@@ -185,11 +313,11 @@ onUnmounted(() => {
         <div class="hw-stats">
           <div class="hw-stat">
             <span class="hw-stat-label">오늘 매출</span>
-            <span class="hw-stat-value">{{ dash.data ? won(dash.data.summary.revenue) : '—' }}</span>
+            <span class="hw-stat-value">{{ todayRevenue !== null ? won(todayRevenue) : '—' }}</span>
           </div>
           <div class="hw-stat">
             <span class="hw-stat-label">거래 건수</span>
-            <span class="hw-stat-value">{{ dash.data ? dash.data.summary.transactionsCount.toLocaleString('ko-KR') + '건' : '—' }}</span>
+            <span class="hw-stat-value">{{ todayTransactions !== null ? todayTransactions.toLocaleString('ko-KR') + '건' : '—' }}</span>
           </div>
           <div class="hw-stat">
             <span class="hw-stat-label">예측 정확도</span>
@@ -341,21 +469,21 @@ onUnmounted(() => {
         <section class="card">
           <div class="card-header">
             <h3><span class="live-dot"></span>실시간 AI 알림</h3>
-            <span class="alert-count">{{ activeAnomalies.length }}건</span>
+            <span class="alert-count">긴급 {{ urgentCount }}건</span>
           </div>
           <ul v-if="recentAlerts.length" class="timeline">
-            <li v-for="a in recentAlerts" :key="a.id" class="tl-item">
-              <span class="tl-time">{{ hhmm(a.detectedAt) }}</span>
+            <li v-for="a in recentAlerts" :key="a.key" class="tl-item" :data-sev="a.sev">
+              <span class="tl-time">{{ a.time }}</span>
               <span class="tl-line"><span class="tl-dot"></span></span>
               <div class="tl-body">
-                <span class="tl-title">{{ ANOMALY_LABEL[a.anomalyType] ?? a.anomalyType }}</span>
-                <span v-if="a.zoneCode" class="tl-zone">{{ a.zoneCode }}</span>
+                <span class="tl-title">{{ a.icon }} {{ a.label }}</span>
+                <span class="tl-detail">{{ a.detail }}</span>
               </div>
             </li>
           </ul>
           <div v-else class="tl-empty">
             <span class="tl-empty-icon">✓</span>
-            현재 감지된 이상 신호가 없습니다.
+            현재 조치가 필요한 운영 알림이 없습니다.
           </div>
         </section>
       </div>
@@ -387,19 +515,33 @@ onUnmounted(() => {
           </div>
           <div v-if="reportSeries.length === 0" class="empty">분석 데이터가 없습니다.</div>
           <template v-else>
-            <div class="bar-chart has-limit">
-              <div class="loss-limit"><span class="loss-limit-label">목표 손실 상한선</span></div>
-              <div
-                v-for="r in reportSeries"
-                :key="r.metricDate"
-                class="bar-col"
-              >
-                <div class="bar bar-risk" :style="{ height: `${(Number(r.discardAmount) / maxDiscard) * 100}%` }">
-                  <span class="bar-tip">{{ won(Number(r.discardAmount)) }}<small>{{ r.metricDate.slice(5, 10) }}</small></span>
+            <!-- 요약: 기간·합계·일평균·목표 상한 -->
+            <div class="waste-summary">
+              <span class="ws-item">기간 <b>{{ reportSeries[0].metricDate.slice(5, 10) }} ~ {{ reportSeries[reportSeries.length - 1].metricDate.slice(5, 10) }}</b></span>
+              <span class="ws-item">합계 <b>{{ won(wasteTotal) }}</b></span>
+              <span class="ws-item">일평균 <b>{{ won(wasteAvg) }}</b></span>
+              <span class="ws-item target">목표 상한 <b>{{ won(wasteTarget) }}</b></span>
+            </div>
+            <div class="bar-chart has-limit waste-chart">
+              <span class="y-max">{{ won(maxDiscard) }}</span>
+              <div class="loss-limit" :style="{ bottom: `${Math.min(100, (wasteTarget / maxDiscard) * 100)}%` }">
+                <span class="loss-limit-label">목표 손실 상한선 {{ won(wasteTarget) }}</span>
+              </div>
+              <div v-for="r in reportSeries" :key="r.metricDate" class="bar-col">
+                <div
+                  class="bar bar-risk"
+                  :class="{ over: Number(r.discardAmount) > wasteTarget }"
+                  :style="{ height: `${(Number(r.discardAmount) / maxDiscard) * 100}%` }"
+                >
+                  <span class="bar-tip">
+                    <b>{{ fullDate(r.metricDate) }}</b>
+                    폐기 {{ won(Number(r.discardAmount)) }}<small>폐기율 {{ (Number(r.discardRate) * 100).toFixed(1) }}%</small>
+                  </span>
                 </div>
+                <span class="bar-date" :class="{ wknd: isWeekend(r.metricDate) }">{{ r.metricDate.slice(5, 10) }}</span>
               </div>
             </div>
-            <p class="chart-cap">일별 폐기 손실액 추이 (낮을수록 좋아요)</p>
+            <p class="chart-cap">막대에 마우스를 올리면 정확한 날짜(요일)·폐기액·폐기율을 확인할 수 있어요 · <b class="over-legend">빨간 막대</b>는 목표 상한 초과일</p>
           </template>
         </section>
 
@@ -407,17 +549,17 @@ onUnmounted(() => {
         <section class="card">
           <div class="card-header">
             <h3><span class="sync-dot"></span>실시간 외부 변수 연동</h3>
-            <span class="sync-badge">LIVE</span>
+            <span class="sync-badge">{{ lastSync ? 'LIVE · ' + lastSync : 'LIVE' }}</span>
           </div>
           <ul class="ext-list">
             <li class="ext-item">
               <span class="ext-icon">{{ weather?.emoji ?? '🌦️' }}</span>
               <div class="ext-body">
-                <span class="ext-label">현재 기상 · 공주시</span>
+                <span class="ext-label">현재 기상 · 서울</span>
                 <span v-if="weather" class="ext-value">
                   {{ weather.label }} {{ weather.temp }}°C <em>({{ weather.note }})</em>
                 </span>
-                <span v-else class="ext-value">불러오는 중… <em>(공주시 실시간)</em></span>
+                <span v-else class="ext-value">불러오는 중… <em>(서울 실시간)</em></span>
               </div>
               <span class="ext-status"><span class="status-dot"></span>LIVE</span>
             </li>
@@ -425,7 +567,14 @@ onUnmounted(() => {
               <span class="ext-icon">🎪</span>
               <div class="ext-body">
                 <span class="ext-label">인근 행사</span>
-                <span class="ext-value">지역 축제 진행 중</span>
+                <template v-if="nearbyEvent">
+                  <span class="ext-value">
+                    {{ nearbyEvent.universityShortName ?? nearbyEvent.universityName }} · {{ nearbyEvent.title }}
+                    <em>({{ nearbyEvent.status === 'active' ? '진행중' : 'D-' + nearbyEvent.daysUntilStart }} · {{ nearbyEvent.startDate.slice(5) }}~{{ nearbyEvent.endDate.slice(5) }}<template v-if="nearbyEvent.peakHours"> · 피크 {{ nearbyEvent.peakHours }}</template>)</em>
+                  </span>
+                  <span class="ext-impact">📌 매점 영향: {{ nearbyEvent.headline }}</span>
+                </template>
+                <span v-else class="ext-value">예정된 인근 대학 행사 없음 <em>(평시)</em></span>
               </div>
               <span class="ext-status"><span class="status-dot"></span>실시간</span>
             </li>
@@ -669,9 +818,14 @@ onUnmounted(() => {
 }
 .tl-item:first-child .tl-line::before { top: 0.3rem; }
 .tl-item:last-child .tl-line::before { bottom: auto; height: 0.3rem; }
-.tl-body { display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.7rem; }
+.tl-body { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.1rem; padding-bottom: 0.7rem; min-width: 0; }
 .tl-title { font-size: 0.88rem; font-weight: 600; color: #0d253d; }
+.tl-detail { font-size: 0.77rem; color: #64748d; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tl-zone { background: #eef3f8; color: #3f5069; border-radius: 6px; padding: 0.05rem 0.45rem; font-size: 0.74rem; }
+.tl-item[data-sev='high'] .tl-dot { background: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15); }
+.tl-item[data-sev='mid'] .tl-dot { background: #f59e0b; }
+.tl-item[data-sev='info'] .tl-dot { background: #3b82f6; }
+.tl-item[data-sev='high'] .tl-title { color: #b91c1c; }
 .tl-empty {
   display: flex; align-items: center; gap: 0.5rem;
   color: #64748d; font-size: 0.9rem; padding: 0.6rem 0;
@@ -732,6 +886,42 @@ onUnmounted(() => {
 /* 통합: 매출·수익 분석 차트 */
 .report-kpi { font-size: 0.8rem; color: #64748d; font-weight: 600; }
 .chart-cap { margin: 0.5rem 0 0; font-size: 0.75rem; color: #8a99af; text-align: center; }
+.over-legend { color: #dc2626; font-weight: 700; }
+
+/* 폐기 손실 추이 — 요약·날짜축·목표선·툴팁 보강 */
+.waste-summary { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-bottom: 0.7rem; font-size: 0.78rem; color: #64748d; }
+.waste-summary b { color: #0d253d; font-weight: 700; }
+.waste-summary .ws-item.target b { color: #c2410c; }
+.waste-chart { position: relative; margin-bottom: 1.6rem; }
+.waste-chart .bar-col { position: relative; }
+.waste-chart .y-max { position: absolute; left: 0; top: -4px; font-size: 0.6rem; color: #94a3b8; background: #fff; padding: 0 2px; z-index: 2; }
+.bar.bar-risk.over { background: linear-gradient(180deg, #dc2626 0%, rgba(220, 38, 38, 0.1) 100%); }
+.bar-date {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) rotate(-50deg);
+  transform-origin: top center;
+  margin-top: 4px;
+  font-size: 0.52rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bar-date.wknd { color: #ef8da0; font-weight: 700; }
+.bar-tip b { font-size: 0.72rem; }
+
+/* 인근 행사 — 매점 영향 안내(작게) */
+.ext-impact {
+  font-size: 0.76rem;
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 0.18rem 0.45rem;
+  margin-top: 0.2rem;
+  line-height: 1.4;
+}
 .cat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .cat-row { display: grid; grid-template-columns: 5rem 1fr auto; align-items: center; gap: 0.6rem; cursor: default; padding: 0.2rem; border-radius: 6px; }
 .cat-row:hover, .cat-row.active { background: #eef3f8; }

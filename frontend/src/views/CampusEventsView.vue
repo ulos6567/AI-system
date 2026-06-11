@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import {
   campusApi,
@@ -43,6 +43,72 @@ const EVENT_ICON: Record<string, string> = {
 function qKey(eventId: number, inventoryId: number): string {
   return `${eventId}:${inventoryId}`;
 }
+
+// ── 전국 대학 검색·지역 필터 ──────────────────────────────────────────────
+const UNI_LIMIT = 60; // 카드 과다 렌더 방지: 필터 결과 상위 N개만 표시
+const EVENT_LIMIT = 150;
+const regionFilter = ref('전체'); // 시·도
+const districtFilter = ref('전체'); // 시·군·구 (구체적 2단계)
+const search = ref('');
+const calendarScope = ref<'current' | 'all'>('current'); // current=진행중·예정만
+
+// 주소(시·도 시·군·구 동) 기준으로 지역 단계 추출
+function uniTokens(u: UniversitySummary): string[] {
+  return (u.address ?? u.region ?? '').trim().split(/\s+/).filter(Boolean);
+}
+function sidoOf(u: UniversitySummary): string {
+  return uniTokens(u)[0] ?? '기타';
+}
+function districtOf(u: UniversitySummary): string {
+  return uniTokens(u)[1] ?? '';
+}
+function sido(region: string | null): string {
+  return region ? region.trim().split(/\s+/)[0] : '기타';
+}
+const regions = computed(() => {
+  const set = new Set<string>();
+  for (const u of universities.value) set.add(sidoOf(u));
+  return ['전체', ...[...set].sort()];
+});
+// 선택한 시·도의 시·군·구 목록 (구체적 선택용)
+const districts = computed(() => {
+  if (regionFilter.value === '전체') return [] as string[];
+  const set = new Set<string>();
+  for (const u of universities.value) {
+    if (sidoOf(u) === regionFilter.value && districtOf(u)) set.add(districtOf(u));
+  }
+  return ['전체', ...[...set].sort()];
+});
+watch(regionFilter, () => {
+  districtFilter.value = '전체'; // 시·도 변경 시 시·군·구 초기화
+});
+const filteredUniversities = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  return universities.value.filter((u) => {
+    const okRegion = regionFilter.value === '전체' || sidoOf(u) === regionFilter.value;
+    const okDistrict = districtFilter.value === '전체' || districtOf(u) === districtFilter.value;
+    const okSearch =
+      !q ||
+      u.name.toLowerCase().includes(q) ||
+      (u.shortName ?? '').toLowerCase().includes(q) ||
+      (u.address ?? u.region ?? '').toLowerCase().includes(q);
+    return okRegion && okDistrict && okSearch;
+  });
+});
+const displayUniversities = computed(() => filteredUniversities.value.slice(0, UNI_LIMIT));
+const uniOverflow = computed(() => Math.max(0, filteredUniversities.value.length - UNI_LIMIT));
+const nearbyCount = computed(() => universities.value.filter((u) => u.distanceKm != null).length);
+
+const isFiltering = computed(() => regionFilter.value !== '전체' || search.value.trim().length > 0);
+const uniNameSet = computed(() => new Set(filteredUniversities.value.map((u) => u.name)));
+const filteredEvents = computed(() => {
+  let evs = events.value;
+  if (isFiltering.value) evs = evs.filter((e) => uniNameSet.value.has(e.universityName));
+  if (calendarScope.value === 'current') evs = evs.filter((e) => e.status !== 'past');
+  return evs;
+});
+const displayEvents = computed(() => filteredEvents.value.slice(0, EVENT_LIMIT));
+const eventOverflow = computed(() => Math.max(0, filteredEvents.value.length - EVENT_LIMIT));
 
 async function load(): Promise<void> {
   loading.value = true;
@@ -153,29 +219,64 @@ async function applyInventory(p: CampusPlay): Promise<void> {
     <div v-if="!canWrite" class="readonly-note">👁 열람 전용 계정입니다. 이벤트 추진·재고 수정은 관리자만 가능합니다.</div>
 
     <section v-if="summary" class="summary">
-      <div class="metric"><span class="label">인근 대학</span><span class="value">{{ universities.length }}</span></div>
+      <div class="metric"><span class="label">전국 대학</span><span class="value">{{ universities.length }}</span></div>
       <div class="metric fest"><span class="label">진행중 축제</span><span class="value">{{ summary.activeFestival }}</span></div>
       <div class="metric exam"><span class="label">진행중 시험</span><span class="value">{{ summary.activeExam }}</span></div>
-      <div class="metric"><span class="label">임박 일정</span><span class="value">{{ summary.upcoming }}</span></div>
+      <div class="metric"><span class="label">인근 연계 대학</span><span class="value">{{ nearbyCount }}</span></div>
+    </section>
+
+    <!-- 지역·검색 필터 (시·도 → 시·군·구 2단계) -->
+    <section v-if="!loading && !lastError" class="filters">
+      <div class="filter-row">
+        <div class="region-tabs">
+          <button
+            v-for="rg in regions"
+            :key="rg"
+            class="region-tab"
+            :class="{ active: regionFilter === rg }"
+            @click="regionFilter = rg"
+          >
+            {{ rg }}
+          </button>
+        </div>
+        <input v-model="search" class="search" type="search" placeholder="대학명·주소 검색 (예: 공주대, 신관동)" />
+      </div>
+      <div v-if="districts.length" class="region-tabs district-tabs">
+        <span class="district-label">{{ regionFilter }} ›</span>
+        <button
+          v-for="d in districts"
+          :key="d"
+          class="region-tab sub"
+          :class="{ active: districtFilter === d }"
+          @click="districtFilter = d"
+        >
+          {{ d }}
+        </button>
+      </div>
     </section>
 
     <div v-if="loading" class="loading">불러오는 중…</div>
     <div v-else-if="lastError" class="error">에러: {{ lastError }}</div>
 
     <template v-else>
-      <!-- 인근 대학 현황 -->
+      <!-- 전국 대학 현황 (인근 우선) -->
       <section class="card">
-        <div class="card-header"><h3>🏫 인근 대학 현황</h3></div>
-        <div v-if="universities.length" class="uni-grid">
-          <div v-for="u in universities" :key="u.id" class="uni-card">
+        <div class="card-header">
+          <h3>🏫 전국 대학 현황</h3>
+          <span class="hint">{{ filteredUniversities.length }}개 표시{{ uniOverflow > 0 ? ` (상위 ${UNI_LIMIT}개만)` : '' }} · 인근 연계 우선</span>
+        </div>
+        <div v-if="displayUniversities.length" class="uni-grid">
+          <div v-for="u in displayUniversities" :key="u.id" class="uni-card">
             <div class="uni-top">
               <strong>{{ u.shortName ?? u.name }}</strong>
               <span class="badge" :class="u.statusLabel === '축제 진행중' ? 'b-fest' : u.statusLabel === '시험기간' ? 'b-exam' : u.statusLabel === '방학' ? 'b-vac' : 'b-idle'">
                 {{ u.statusLabel }}
               </span>
             </div>
+            <p class="uni-addr">📍 {{ u.address ?? u.region ?? '—' }}</p>
             <p class="uni-meta">
-              {{ u.region ?? '—' }} · {{ u.distanceKm != null ? u.distanceKm + 'km' : '—' }}
+              <span v-if="u.distanceKm != null" class="near-tag">인근 {{ u.distanceKm }}km</span>
+              <span v-else>{{ sido(u.region) }}</span>
               <template v-if="u.studentCount"> · 재학생 {{ u.studentCount.toLocaleString() }}명</template>
             </p>
             <div class="chips">
@@ -185,13 +286,20 @@ async function applyInventory(p: CampusPlay): Promise<void> {
             </div>
           </div>
         </div>
-        <div v-else class="empty">이 점포에 연계된 대학이 없습니다.</div>
+        <div v-else class="empty">검색 조건에 맞는 대학이 없습니다.</div>
+        <p v-if="uniOverflow > 0" class="overflow-note">… 외 {{ uniOverflow }}개 대학 — 지역 탭이나 검색으로 좁혀보세요.</p>
       </section>
 
       <!-- 학사 캘린더 -->
       <section class="card">
-        <div class="card-header"><h3>🗓️ 학사 일정 · 통금 시간</h3></div>
-        <table v-if="events.length" class="cal-table">
+        <div class="card-header">
+          <h3>🗓️ 학사 일정 · 시험 캘린더</h3>
+          <div class="scope-toggle">
+            <button :class="{ active: calendarScope === 'current' }" @click="calendarScope = 'current'">진행중·예정</button>
+            <button :class="{ active: calendarScope === 'all' }" @click="calendarScope = 'all'">전체(종료 포함)</button>
+          </div>
+        </div>
+        <table v-if="displayEvents.length" class="cal-table">
           <thead>
             <tr>
               <th>대학</th><th>유형</th><th>일정</th><th>기간</th><th>D-day</th>
@@ -199,7 +307,7 @@ async function applyInventory(p: CampusPlay): Promise<void> {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="e in events" :key="e.id" :class="{ past: e.status === 'past' }">
+            <tr v-for="e in displayEvents" :key="e.id" :class="{ past: e.status === 'past' }">
               <td>{{ e.universityShortName ?? e.universityName }}</td>
               <td><span class="cat" :class="'c-' + e.eventType">{{ EVENT_ICON[e.eventType] }} {{ EVENT_LABEL[e.eventType] }}</span></td>
               <td>{{ e.title }}</td>
@@ -216,7 +324,8 @@ async function applyInventory(p: CampusPlay): Promise<void> {
             </tr>
           </tbody>
         </table>
-        <div v-else class="empty">학사 일정이 없습니다.</div>
+        <div v-else class="empty">조건에 맞는 학사 일정이 없습니다.</div>
+        <p v-if="eventOverflow > 0" class="overflow-note">… 외 {{ eventOverflow }}건 — 지역·검색으로 좁혀보세요.</p>
       </section>
 
       <!-- AI 추천: 이벤트 추진 · 재고 조정 -->
@@ -336,10 +445,29 @@ async function applyInventory(p: CampusPlay): Promise<void> {
 h3 { margin: 0; font-size: 1.05rem; }
 .hint, .muted { color: #8a99af; font-size: 0.82rem; }
 
+/* 지역·검색 필터 (2단계) */
+.filters { display: flex; flex-direction: column; gap: 0.55rem; }
+.filter-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.region-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.region-tab { border: 1px solid #d7def0; background: #fff; color: #475569; border-radius: 999px; padding: 0.25rem 0.7rem; font-size: 0.8rem; cursor: pointer; }
+.region-tab:hover { background: #eef3f8; }
+.region-tab.active { background: #533afd; border-color: #533afd; color: #fff; font-weight: 600; }
+.search { flex: 1; min-width: 200px; max-width: 320px; border: 1px solid #c7d2e0; border-radius: 8px; padding: 0.45rem 0.7rem; font-size: 0.88rem; }
+.district-tabs { padding: 0.5rem 0.6rem; background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 10px; }
+.district-label { font-size: 0.78rem; font-weight: 700; color: #4434d4; margin-right: 0.15rem; }
+.region-tab.sub { font-size: 0.78rem; padding: 0.2rem 0.6rem; }
+.region-tab.sub.active { background: #4434d4; border-color: #4434d4; }
+.overflow-note { margin: 0.75rem 0 0; color: #8a99af; font-size: 0.82rem; text-align: center; }
+.scope-toggle { display: flex; gap: 0.25rem; background: #f1f5f9; border-radius: 8px; padding: 0.15rem; }
+.scope-toggle button { border: none; background: transparent; color: #64748b; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.8rem; cursor: pointer; }
+.scope-toggle button.active { background: #fff; color: #4434d4; font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,0.08); }
+
 .uni-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.8rem; }
-.uni-card { border: 1px solid #eef3f8; border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.uni-card { border: 1px solid #eef3f8; border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .uni-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.uni-meta { margin: 0; color: #64748d; font-size: 0.78rem; }
+.uni-addr { margin: 0; color: #475569; font-size: 0.78rem; }
+.uni-meta { margin: 0; color: #64748d; font-size: 0.78rem; display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.near-tag { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 999px; padding: 0.05rem 0.45rem; font-size: 0.72rem; font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .chip { font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 999px; background: #eef3f8; color: #3f5069; }
 .chip.c-festival { background: #fce7f3; color: #be185d; }

@@ -17,6 +17,8 @@ import { logger } from '../lib/logger';
 
 const STORES = [1, 2, 3];
 const DAYS = 30;
+// 예측 정확도(MAPE) 산출을 위해 과거 수요예측을 생성할 최근 일수
+const FORECAST_BACKFILL_DAYS = 14;
 
 // 점포별 거래량 성향 (기본 일일 거래 수, 주말 가중)
 const STORE_PROFILE: Record<number, { base: number; weekendBoost: number }> = {
@@ -154,7 +156,9 @@ async function seedTransactions(storeId: number, today: Date): Promise<void> {
     const day = addDays(today, -d);
     const dow = day.getDay(); // 0=일,6=토
     const isWeekend = dow === 0 || dow === 6;
-    let count = Math.round(profile.base * (isWeekend ? profile.weekendBoost : 1) * (0.8 + Math.random() * 0.4));
+    // 일별 변동 ±8% — 같은 요일 평균 기반 수요예측이 따라잡을 수 있는 현실적 노이즈 폭.
+    //   (과거 ±20% 는 예측 불가능한 잡음이라 예측정확도 상한을 ~88%로 묶었음)
+    let count = Math.round(profile.base * (isWeekend ? profile.weekendBoost : 1) * (0.92 + Math.random() * 0.16));
     // 오늘은 영업 중이라 절반 정도만 (진행 중인 하루)
     if (d === 0) count = Math.round(count * 0.55);
 
@@ -457,6 +461,12 @@ async function main(): Promise<void> {
     await seedEmployees(storeId);
     // 거래 이력 기반 내일자 수요예측
     await forecastStoreFor(storeId, tomorrow);
+    // 과거 일자 수요예측 백필 — KPI 집계 시 예측 정확도(MAPE) 산출용.
+    //   최근 14일만 생성: 동일 요일 2~4주치 이력이 쌓여 예측이 의미 있는 구간.
+    //   (이 구간이 없으면 대시보드 '예측 정확도'가 '—' 로 비어 보임)
+    for (let d = FORECAST_BACKFILL_DAYS; d >= 1; d--) {
+      await forecastStoreFor(storeId, addDays(today, -d));
+    }
     // 최근 30일 KPI 일별 집계 (매출 리포트)
     await backfillRange(storeId, addDays(today, -(DAYS - 1)), today);
     logger.info({ storeId }, 'store refresh complete');

@@ -35,6 +35,7 @@ export interface UniversitySummary {
   name: string;
   shortName: string | null;
   region: string | null;
+  address: string | null;
   distanceKm: number | null;
   studentCount: number | null;
   activeFestival: boolean;
@@ -118,8 +119,17 @@ function trimTime(v: string | null): string | null {
   return v.length >= 5 ? v.slice(0, 5) : v;
 }
 
-async function queryEvents(storeId: number): Promise<CampusEventRow[]> {
+/**
+ * 학사 이벤트 조회.
+ *   - scope='nearby': 점포 인근(store_university 연계) 대학만 — 추천 생성용
+ *   - scope='all'   : 전국 모든 대학 — 화면 표시용(인근 대학은 거리값 동반)
+ */
+async function queryEvents(storeId: number, scope: 'nearby' | 'all' = 'nearby'): Promise<CampusEventRow[]> {
   const pool = getPool();
+  const joinSu =
+    scope === 'all'
+      ? 'LEFT JOIN store_university su ON su.university_id = a.university_id AND su.store_id = ?'
+      : 'JOIN store_university su ON su.university_id = a.university_id AND su.store_id = ?';
   const [rows] = await pool.query<any[]>(
     `SELECT a.id, a.university_id AS universityId, u.name AS universityName,
             u.short_name AS universityShortName, su.distance_km AS distanceKm,
@@ -134,7 +144,7 @@ async function queryEvents(storeId: number): Promise<CampusEventRow[]> {
             DATEDIFF(a.end_date, CURRENT_DATE)   AS daysUntilEnd
        FROM academic_event a
        JOIN university u        ON u.id = a.university_id
-       JOIN store_university su ON su.university_id = a.university_id AND su.store_id = ?
+       ${joinSu}
       ORDER BY FIELD(status, 'active', 'upcoming', 'past'),
                (status = 'past') * -1, -- past 는 최근 종료 우선
                a.start_date ASC`,
@@ -162,15 +172,16 @@ async function queryEvents(storeId: number): Promise<CampusEventRow[]> {
 
 export async function listUniversities(storeId: number): Promise<UniversitySummary[]> {
   const pool = getPool();
+  // 전국 모든 대학을 표시한다. 점포 인근(store_university 연계) 대학은 거리값을 동반하며 상단에 노출.
   const [unis] = await pool.query<any[]>(
-    `SELECT u.id, u.name, u.short_name AS shortName, u.region,
+    `SELECT u.id, u.name, u.short_name AS shortName, u.region, u.address,
             su.distance_km AS distanceKm, u.student_count AS studentCount
        FROM university u
-       JOIN store_university su ON su.university_id = u.id AND su.store_id = ?
-      ORDER BY su.distance_km ASC, u.name ASC`,
+       LEFT JOIN store_university su ON su.university_id = u.id AND su.store_id = ?
+      ORDER BY (su.distance_km IS NULL), su.distance_km ASC, u.region ASC, u.name ASC`,
     [storeId],
   );
-  const events = await queryEvents(storeId);
+  const events = await queryEvents(storeId, 'all');
   return unis.map((u) => {
     const own = events.filter((e) => e.universityId === Number(u.id));
     const activeFestival = own.some((e) => e.status === 'active' && e.eventType === 'festival');
@@ -188,6 +199,7 @@ export async function listUniversities(storeId: number): Promise<UniversitySumma
       name: u.name,
       shortName: u.shortName,
       region: u.region,
+      address: u.address ?? null,
       distanceKm: num(u.distanceKm),
       studentCount: num(u.studentCount),
       activeFestival,
@@ -200,7 +212,7 @@ export async function listUniversities(storeId: number): Promise<UniversitySumma
 }
 
 export async function listCalendar(storeId: number): Promise<CampusEventRow[]> {
-  return queryEvents(storeId);
+  return queryEvents(storeId, 'all');
 }
 
 async function inventoryTargetsFor(
@@ -237,7 +249,8 @@ async function inventoryTargetsFor(
 
 /** 진행중·임박(7일 이내) 학사 일정에 대한 이벤트·재고 추천 생성 */
 export async function buildRecommendations(storeId: number): Promise<CampusPlay[]> {
-  const events = await queryEvents(storeId);
+  // 추천(재고·프로모션)은 해당 점포에 영향이 있는 '인근' 대학 기준으로만 생성한다.
+  const events = await queryEvents(storeId, 'nearby');
   const qualifying = events.filter(
     (e) =>
       PLAYBOOK[e.eventType] &&

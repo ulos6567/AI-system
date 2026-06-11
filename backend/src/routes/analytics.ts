@@ -10,13 +10,19 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth/jwt';
 import { requireStoreScope, requireAdmin } from '../middleware/rbac';
-import { getHeatmap, getBehaviorStats, placementSuggestions, rebuildBehaviorInsights } from '../services/analytics';
+import { getHeatmap, getBehaviorStats, placementSuggestions, rebuildBehaviorInsights, getImpulseZone } from '../services/analytics';
 
 const router = Router({ mergeParams: true });
 
 router.get('/heatmap', requireAuth, requireStoreScope(), async (req, res) => {
   const storeId = Number(req.params.storeId);
   res.json({ storeId, ...(await getHeatmap(storeId)) });
+});
+
+// 충동 최적 구역(Impulse Zone) — 계산대 대기 구역 터치·전환 분석 + 라인업 추천
+router.get('/impulse', requireAuth, requireStoreScope(), async (req, res) => {
+  const storeId = Number(req.params.storeId);
+  res.json({ storeId, ...(await getImpulseZone(storeId)) });
 });
 
 router.get('/insights', requireAuth, requireStoreScope(), async (req, res) => {

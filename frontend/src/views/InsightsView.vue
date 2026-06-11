@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useInsightsStore } from '@/stores/insights';
-import type { PrescriptiveAction } from '@/api/insights';
+import type { PrescriptiveAction, MarkdownSimulation } from '@/api/insights';
 
 const auth = useAuthStore();
 const insights = useInsightsStore();
@@ -99,6 +99,48 @@ async function showOutcome(a: PrescriptiveAction): Promise<void> {
   await insights.loadOutcome(storeId.value, a.id);
 }
 
+// ── ② 오늘의 운영 브리핑 / ③ ROI 롤업 ────────────────────────────────────
+const briefing = computed(() => insights.briefing);
+const roi = computed(() => insights.roi);
+function won(n: number): string {
+  return `${Math.round(n).toLocaleString('ko-KR')}원`;
+}
+function pctText(n: number | null): string {
+  return n == null ? '—' : `${n >= 0 ? '+' : ''}${n}%`;
+}
+
+// ── ④ 마크다운 시뮬레이터 (What-if) ──────────────────────────────────────
+const openSimId = ref<number | null>(null);
+const simPercent = ref(20);
+const simHours = ref(6);
+const simData = ref<MarkdownSimulation | null>(null);
+const simLoading = ref(false);
+
+function isMarkdown(a: PrescriptiveAction): boolean {
+  return a.actionType === 'price_markdown' && a.targetProductId != null;
+}
+async function runSim(a: PrescriptiveAction): Promise<void> {
+  simLoading.value = true;
+  simData.value = await insights.simulate(storeId.value, a.id, simPercent.value, simHours.value);
+  simLoading.value = false;
+}
+async function toggleSim(a: PrescriptiveAction): Promise<void> {
+  if (openSimId.value === a.id) {
+    openSimId.value = null;
+    return;
+  }
+  openSimId.value = a.id;
+  const rec = (a.recommendation as any) ?? {};
+  simPercent.value = Number(rec.percent ?? 20);
+  simHours.value = Number(rec.durationHours ?? 6);
+  await runSim(a);
+}
+async function applySim(a: PrescriptiveAction): Promise<void> {
+  await insights.approve(storeId.value, a.id, { percent: simPercent.value, durationHours: simHours.value });
+  openSimId.value = null;
+  await insights.loadOutcome(storeId.value, a.id);
+}
+
 onMounted(load);
 </script>
 
@@ -132,39 +174,126 @@ onMounted(load);
 
     <p v-if="insights.lastError" class="error">{{ insights.lastError }}</p>
 
+    <!-- ② 오늘의 운영 브리핑 (KPI) -->
+    <section v-if="briefing" class="briefing">
+      <div class="kpi">
+        <span class="k-label">오늘 매출</span>
+        <span class="k-value">{{ won(briefing.todayRevenue) }}</span>
+        <span class="k-sub">
+          어제 <b :class="(briefing.vsYesterdayPct ?? 0) >= 0 ? 'up' : 'down'">{{ pctText(briefing.vsYesterdayPct) }}</b>
+          · 지난주 <b :class="(briefing.vsLastWeekPct ?? 0) >= 0 ? 'up' : 'down'">{{ pctText(briefing.vsLastWeekPct) }}</b>
+        </span>
+      </div>
+      <div class="kpi">
+        <span class="k-label">객단가</span>
+        <span class="k-value">{{ won(briefing.avgTicket) }}</span>
+        <span class="k-sub">거래 {{ briefing.todayTx.toLocaleString() }}건</span>
+      </div>
+      <div class="kpi">
+        <span class="k-label">예상 마감 매출</span>
+        <span class="k-value">{{ won(briefing.projectedClose) }}</span>
+        <span class="k-sub">시간대 페이스 추정</span>
+      </div>
+      <div class="kpi">
+        <span class="k-label">처리할 알림</span>
+        <span class="k-value">{{ briefing.proposedActions.toLocaleString() }}</span>
+        <span class="k-sub">미열람 신호 {{ briefing.openSignals.toLocaleString() }}</span>
+      </div>
+      <div class="kpi warn">
+        <span class="k-label">폐기 위험액</span>
+        <span class="k-value">{{ won(briefing.wasteRiskAmount) }}</span>
+        <span class="k-sub">{{ briefing.wasteRiskItems }}품목 · {{ briefing.wasteRiskUnits.toLocaleString() }}개</span>
+      </div>
+    </section>
+
+    <!-- ③ 처방 효과 ROI 롤업 -->
+    <section v-if="roi" class="roi">
+      <span class="roi-tag">📈 처방 효과 ({{ roi.period }})</span>
+      <template v-if="roi.executed > 0">
+        <span class="roi-item">적용 <b>{{ roi.executed }}건</b></span>
+        <span class="roi-item">적중률 <b>{{ roi.hitRate != null ? roi.hitRate + '%' : '검증 대기' }}</b><small>({{ roi.hits }}/{{ roi.verified }})</small></span>
+        <span class="roi-item">추정 추가효과 <b class="up">{{ won(roi.estValueWon) }}</b><small v-if="roi.addedUnits"> · {{ roi.addedUnits.toLocaleString() }}개</small></span>
+      </template>
+      <span v-else class="roi-empty">아직 적용한 조치가 없습니다 — 추천 조치를 ‘조치 적용’하면 효과가 누적 집계됩니다.</span>
+    </section>
+
     <!-- 추천 조치 카드 -->
     <section class="card">
       <div class="card-header"><h3>오늘의 추천 조치 ({{ proposed.length }})</h3></div>
       <div v-if="insights.loading" class="loading">불러오는 중…</div>
       <div v-else-if="proposed.length === 0" class="empty">현재 제안된 추천 조치가 없습니다. ‘지금 분석’으로 새 알림을 확인하세요.</div>
       <ul v-else class="action-list">
-        <li v-for="a in proposed" :key="a.id" class="action-card" :data-sev="a.priority >= 400 ? 'high' : 'mid'">
-          <!-- 좌측: 조치 유형 · 상품 · 핵심 이슈 -->
-          <div class="col col-left">
-            <span class="badge type">{{ actionLabel[a.actionType] ?? a.actionType }}</span>
-            <p class="prod">{{ a.targetProductName ?? '점포 전체' }}</p>
-            <span class="issue-tag">{{ issueTag(a) }}</span>
-          </div>
-
-          <!-- 중앙: 행동 가이드 -->
-          <div class="col col-mid">
-            <p class="guide">{{ guideText(a) }}</p>
-          </div>
-
-          <!-- 우측: 지표 · 조치 적용 -->
-          <div class="col col-right">
-            <div class="metrics">
-              <span class="metric conf">신뢰도 {{ displayConfidence(a) }}%</span>
-              <span class="metric uplift">{{ expectedText(a) }}</span>
+        <li v-for="a in proposed" :key="a.id" class="action-item" :data-sev="a.priority >= 400 ? 'high' : 'mid'">
+          <div class="action-card">
+            <!-- 좌측: 조치 유형 · 상품 · 핵심 이슈 -->
+            <div class="col col-left">
+              <span class="badge type">{{ actionLabel[a.actionType] ?? a.actionType }}</span>
+              <p class="prod">{{ a.targetProductName ?? '점포 전체' }}</p>
+              <span class="issue-tag">{{ issueTag(a) }}</span>
             </div>
-            <template v-if="auth.isAdmin">
-              <button class="primary apply" @click="approve(a)">조치 적용</button>
-              <button class="ghost reject" @click="reject(a)">거절</button>
+
+            <!-- 중앙: 행동 가이드 -->
+            <div class="col col-mid">
+              <p class="guide">{{ guideText(a) }}</p>
+            </div>
+
+            <!-- 우측: 지표 · 조치 적용 -->
+            <div class="col col-right">
+              <div class="metrics">
+                <span class="metric conf">신뢰도 {{ displayConfidence(a) }}%</span>
+                <span class="metric uplift">{{ expectedText(a) }}</span>
+              </div>
+              <template v-if="auth.isAdmin">
+                <button class="primary apply" @click="approve(a)">조치 적용</button>
+                <button
+                  v-if="isMarkdown(a)"
+                  class="ghost sim-btn"
+                  :class="{ active: openSimId === a.id }"
+                  @click="toggleSim(a)"
+                >
+                  🎚 시뮬레이션
+                </button>
+                <button class="ghost reject" @click="reject(a)">거절</button>
+              </template>
+              <template v-else>
+                <button class="primary apply" disabled>조치 적용</button>
+                <p class="need-perm">운영자 권한 필요</p>
+              </template>
+            </div>
+          </div>
+
+          <!-- ④ 마크다운 시뮬레이터 (What-if) -->
+          <div v-if="auth.isAdmin && isMarkdown(a) && openSimId === a.id" class="sim-panel">
+            <div class="sim-controls">
+              <label class="sim-ctl">
+                인하율 <b>{{ simPercent }}%</b>
+                <input type="range" min="5" max="70" step="5" v-model.number="simPercent" @change="runSim(a)" />
+              </label>
+              <label class="sim-ctl">
+                적용 기간
+                <select v-model.number="simHours" @change="runSim(a)">
+                  <option :value="3">3시간</option>
+                  <option :value="6">6시간</option>
+                  <option :value="12">12시간</option>
+                  <option :value="24">24시간</option>
+                </select>
+              </label>
+            </div>
+            <div v-if="simLoading" class="sim-loading">예상 효과 계산 중…</div>
+            <template v-else-if="simData && simData.applicable">
+              <div class="sim-grid">
+                <div class="sim-metric"><span>예상 소진</span><b>{{ simData.daysToSellOut ?? '—' }}일</b></div>
+                <div class="sim-metric"><span>기간 내 판매</span><b>{{ simData.unitsInWindow }}개</b><small>/재고 {{ simData.currentQty }}</small></div>
+                <div class="sim-metric"><span>인하가</span><b>{{ won(simData.adjustedPrice ?? 0) }}</b><small>정상 {{ won(simData.unitPrice ?? 0) }}</small></div>
+                <div class="sim-metric"><span>기간 매출</span><b>{{ won(simData.revenueInWindow ?? 0) }}</b></div>
+                <div class="sim-metric"><span>할인 비용</span><b class="down">-{{ won(simData.discountCost ?? 0) }}</b></div>
+                <div class="sim-metric"><span>예상 판매상승</span><b class="up">+{{ simData.projectedUpliftPct }}%</b></div>
+              </div>
+              <button class="primary apply-sim" @click="applySim(a)">
+                이 조건으로 적용 ({{ simPercent }}% · {{ simHours }}시간)
+              </button>
             </template>
-            <template v-else>
-              <button class="primary apply" disabled>조치 적용</button>
-              <p class="need-perm">운영자 권한 필요</p>
-            </template>
+            <div v-else class="sim-na">시뮬레이션 대상이 아닙니다(상품·가격 정보 부족).</div>
           </div>
         </li>
       </ul>
@@ -226,14 +355,50 @@ onMounted(load);
 }
 .sep { color: #94a3b8; font-size: 0.8rem; }
 
+/* ② 오늘의 운영 브리핑 (KPI) */
+.briefing { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.6rem; }
+.kpi { background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; padding: 0.75rem 0.85rem; display: flex; flex-direction: column; gap: 0.18rem; }
+.kpi.warn { background: #fff8f1; border-color: #fed7aa; }
+.k-label { font-size: 0.75rem; color: #64748b; }
+.k-value { font-size: 1.25rem; font-weight: 800; color: #0d253d; letter-spacing: -0.02em; }
+.k-sub { font-size: 0.74rem; color: #8a99af; }
+.k-sub b.up { color: #059669; } .k-sub b.down { color: #dc2626; }
+@media (max-width: 900px) { .briefing { grid-template-columns: repeat(2, 1fr); } }
+
+/* ③ ROI 롤업 */
+.roi { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 0.6rem 0.9rem; }
+.roi-tag { font-size: 0.82rem; font-weight: 700; color: #047857; }
+.roi-item { font-size: 0.85rem; color: #334155; }
+.roi-item b { color: #0d253d; } .roi-item b.up { color: #059669; }
+.roi-item small { color: #8a99af; margin-left: 0.2rem; }
+.roi-empty { font-size: 0.83rem; color: #64748b; }
+
 /* 추천 조치 리스트 */
 .action-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
-.action-card {
-  display: grid; grid-template-columns: repeat(12, 1fr); align-items: stretch; gap: 0;
-  border: 1px solid #e3e8ee; border-left: 4px solid #f59e0b; border-radius: 8px;
-  overflow: hidden;
+.action-item {
+  border: 1px solid #e3e8ee; border-left: 4px solid #f59e0b; border-radius: 8px; overflow: hidden;
 }
-.action-card[data-sev='high'] { border-left-color: #ef4444; }
+.action-item[data-sev='high'] { border-left-color: #ef4444; }
+.action-card { display: grid; grid-template-columns: repeat(12, 1fr); align-items: stretch; gap: 0; }
+
+/* ④ 마크다운 시뮬레이터 */
+.sim-btn { width: 100%; max-width: 9rem; font-size: 0.82rem; }
+.sim-btn.active { background: #eef0ff; border-color: #c7c2f5; color: #4434d4; }
+.sim-panel { border-top: 1px dashed #e3e8ee; background: #fafbff; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.sim-controls { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center; }
+.sim-ctl { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: #475569; }
+.sim-ctl b { color: #4434d4; }
+.sim-ctl input[type='range'] { width: 160px; }
+.sim-ctl select { padding: 0.25rem 0.4rem; border: 1px solid #cdd7e3; border-radius: 6px; }
+.sim-loading, .sim-na { font-size: 0.85rem; color: #8a99af; }
+.sim-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; }
+.sim-metric { background: #fff; border: 1px solid #eef1f6; border-radius: 8px; padding: 0.45rem 0.55rem; display: flex; flex-direction: column; gap: 0.1rem; }
+.sim-metric span { font-size: 0.72rem; color: #64748b; }
+.sim-metric b { font-size: 0.95rem; color: #0d253d; }
+.sim-metric b.up { color: #059669; } .sim-metric b.down { color: #dc2626; }
+.sim-metric small { font-size: 0.68rem; color: #94a3b8; }
+.apply-sim { align-self: flex-start; padding: 0.5rem 1rem; font-weight: 600; }
+@media (max-width: 900px) { .sim-grid { grid-template-columns: repeat(3, 1fr); } }
 .col { padding: 0.9rem 1rem; display: flex; flex-direction: column; }
 .col-left { grid-column: span 3; gap: 0.45rem; border-right: 1px solid #eef1f6; justify-content: center; }
 .col-mid { grid-column: span 6; border-right: 1px solid #eef1f6; justify-content: center; }

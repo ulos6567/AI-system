@@ -28,6 +28,7 @@ export interface UniversitySummary {
   name: string;
   shortName: string | null;
   region: string | null;
+  address: string | null;
   distanceKm: number | null;
   studentCount: number | null;
   activeFestival: boolean;

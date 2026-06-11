@@ -22,19 +22,19 @@ const navGroups = [
   {
     label: '매장 분석',
     items: [
-      { name: 'assistant', label: 'AI 점포 매니저 어시스턴트', icon: '🤖' },
-      { name: 'insights',  label: '오늘의 점포 운영 현황', icon: '💡' },
       { name: 'analytics', label: '구역별 상품 진열 최적화', icon: '🗺️' },
+      { name: 'campus',    label: '대학 축제·시험 캘린더', icon: '🎓' },
+      { name: 'sales-patterns', label: '판매 패턴 분석', icon: '📊' },
+      { name: 'insights',  label: '오늘의 점포 운영 현황', icon: '💡' },
+      { name: 'assistant', label: 'AI 점포 매니저 어시스턴트', icon: '🤖' },
     ],
   },
   {
     label: '매장 관리',
     items: [
       { name: 'orders',         label: '발주 관리',  icon: '📦' },
-      { name: 'campus',         label: '대학 축제·시험 캘린더', icon: '🎓' },
       { name: 'pricing-rules',  label: '실시간 가격 설정', icon: '💲' },
       { name: 'mappings',       label: '상품 코드 관리',     icon: '🔗' },
-      { name: 'cash',           label: '시재 점검', icon: '💵' },
       { name: 'local-delivery', label: '로컬 상생 배송 관리', icon: '🚚' },
     ],
   },
