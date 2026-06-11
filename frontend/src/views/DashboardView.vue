@@ -308,6 +308,33 @@ onUnmounted(() => {
               <span class="cat-val">{{ won(c.revenue) }}</span>
             </li>
           </ul>
+          <p class="cat-hint">카테고리를 선택하면 해당 분류의 상품 판매 순위를 볼 수 있어요.</p>
+        </section>
+
+        <!-- 선택 카테고리 상품 판매 순위 -->
+        <section v-if="dash.category && dash.data.categoryRanking" class="card">
+          <div class="card-header">
+            <h3>🏆 {{ catLabel(dash.category) }} 상품 판매 순위</h3>
+            <span class="chip">{{ dash.data.from.slice(5) }}~{{ dash.data.to.slice(5) }} · <a @click="applyCategory(null)">전체 보기</a></span>
+          </div>
+          <div v-if="dash.data.categoryRanking.length === 0" class="empty">기간 내 판매 데이터가 없습니다.</div>
+          <table v-else class="rank-table">
+            <thead>
+              <tr><th>순위</th><th>상품</th><th>판매량</th><th>매출</th><th>비중</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in dash.data.categoryRanking" :key="p.productId" :class="{ top3: p.rank <= 3 }">
+                <td class="rk"><span class="medal" :data-rank="p.rank">{{ p.rank }}</span></td>
+                <td class="pname">{{ p.name }}</td>
+                <td class="num">{{ p.units.toLocaleString('ko-KR') }}개</td>
+                <td class="num">{{ won(p.revenue) }}</td>
+                <td class="share-cell">
+                  <span class="share-bar-wrap"><span class="share-bar" :style="{ width: `${Math.round(p.share * 100)}%` }"></span></span>
+                  <span class="share-val">{{ (p.share * 100).toFixed(1) }}%</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <!-- 실시간 AI 알림 타임라인 로그 -->
@@ -736,4 +763,21 @@ onUnmounted(() => {
 @media (max-width: 560px) {
   .kpi-row { grid-template-columns: 1fr; }
 }
+
+/* 카테고리 상품 판매 순위 */
+.cat-hint { margin: 0.6rem 0 0; font-size: 0.76rem; color: #94a3b8; }
+.rank-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.rank-table th, .rank-table td { padding: 0.5rem 0.5rem; border-bottom: 1px solid #eef3f8; text-align: left; }
+.rank-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
+.rank-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rank-table tr.top3 .pname { font-weight: 600; color: #0d253d; }
+.rank-table .rk { width: 2.4rem; text-align: center; }
+.medal { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; background: #eef3f8; color: #64748b; }
+.medal[data-rank="1"] { background: #fef3c7; color: #b45309; }
+.medal[data-rank="2"] { background: #e5e7eb; color: #4b5563; }
+.medal[data-rank="3"] { background: #fae8d7; color: #9a5b2e; }
+.share-cell { display: flex; align-items: center; gap: 0.5rem; min-width: 120px; }
+.share-bar-wrap { flex: 1; height: 7px; background: #eef3f8; border-radius: 999px; overflow: hidden; }
+.share-bar { display: block; height: 100%; background: linear-gradient(90deg, #6f63ff, #533afd); border-radius: 999px; }
+.share-val { font-size: 0.78rem; color: #64748b; font-variant-numeric: tabular-nums; min-width: 3rem; text-align: right; }
 </style>

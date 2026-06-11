@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePricingStore } from '@/stores/pricing';
-import type { RuleInput, TriggerType, ActionType } from '@/api/pricing';
+import type { RuleInput, TriggerType, ActionType, PricingEvent } from '@/api/pricing';
 
 const auth = useAuthStore();
 const pricing = usePricingStore();
@@ -96,7 +96,11 @@ const formError = ref<string | null>(null);
 const showForm = ref(false);
 
 onMounted(async () => {
-  await pricing.refreshRules(storeId.value);
+  // 규칙 + 가격 변경 이벤트(현황 카드 집계용). 오늘 이벤트를 모두 포함하도록 넉넉히 조회.
+  await Promise.all([
+    pricing.refreshRules(storeId.value),
+    pricing.refreshEvents(storeId.value, 500),
+  ]);
 });
 
 function resetForm(): void {
@@ -208,10 +212,36 @@ function benefitLabel(r: { actionType: ActionType; actionConfig: Record<string, 
   return `${pct}% 할인${duration}`;
 }
 
-// 상단 현황 위젯
+// 상단 현황 위젯 — 실제 규칙·가격 변경 이벤트에서 집계(고정값 아님)
 const activeCount = computed(() => pricing.rules.filter((r) => !!r.isActive).length);
-const todayConverted = 14; // 데모: 오늘 타임세일로 전환된 상품 수
-const cumulativeGain = 42500; // 데모: 타임세일 누적 추가 매출(원)
+
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+const todayEvents = computed(() => pricing.events.filter((e) => isToday(e.effectiveFrom)));
+// 오늘 타임세일로 가격이 전환된 '상품 수'(중복 제거)
+const todayConverted = computed(() => new Set(todayEvents.value.map((e) => e.productMasterId)).size);
+// 오늘 평균 인하율(%) — 같은 상품이 반복 기록되므로 상품별 최신 이벤트 기준으로 평균.
+// (정상가 대비 인하폭의 평균. 판매량과 무관한 '할인 깊이' 지표)
+const todayAvgMarkdownRate = computed(() => {
+  const latestByProduct = new Map<number, PricingEvent>();
+  for (const e of todayEvents.value) {
+    const prev = latestByProduct.get(e.productMasterId);
+    if (!prev || e.effectiveFrom > prev.effectiveFrom) latestByProduct.set(e.productMasterId, e);
+  }
+  const rates: number[] = [];
+  for (const e of latestByProduct.values()) {
+    if (e.originalPrice > 0) rates.push(1 - e.adjustedPrice / e.originalPrice);
+  }
+  if (!rates.length) return 0;
+  return Math.round((rates.reduce((a, b) => a + b, 0) / rates.length) * 100);
+});
 </script>
 
 <template>
@@ -233,7 +263,7 @@ const cumulativeGain = 42500; // 데모: 타임세일 누적 추가 매출(원)
     <section class="summary-cards">
       <div class="metric-card">
         <div class="metric-text">
-          <span class="metric-label">진행 중인 할인 품목</span>
+          <span class="metric-label">진행 중인 할인 규칙</span>
           <strong class="metric-value">{{ activeCount }}건</strong>
         </div>
         <span class="metric-icon">
@@ -258,8 +288,8 @@ const cumulativeGain = 42500; // 데모: 타임세일 누적 추가 매출(원)
       </div>
       <div class="metric-card">
         <div class="metric-text">
-          <span class="metric-label">누적 성과</span>
-          <strong class="metric-value gain">+{{ cumulativeGain.toLocaleString() }}원</strong>
+          <span class="metric-label">오늘 평균 인하율</span>
+          <strong class="metric-value gain">{{ todayAvgMarkdownRate }}%</strong>
         </div>
         <span class="metric-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

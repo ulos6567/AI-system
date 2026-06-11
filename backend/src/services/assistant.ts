@@ -52,6 +52,8 @@ export interface AssistantAnswer {
   messageId: number;
   content: string;
   sources: GroundingSource[];
+  /** 답변 근거가 된 실제 집계 데이터 라인 (화면에 답변과 함께 표시) */
+  facts: string[];
   hadGrounding: boolean;
   model: string;
 }
@@ -658,17 +660,18 @@ async function insertMessage(
   conversationId: number,
   role: 'user' | 'assistant',
   content: string,
-  opts: { sources?: GroundingSource[]; hadGrounding?: boolean } = {},
+  opts: { sources?: GroundingSource[]; facts?: string[]; hadGrounding?: boolean } = {},
 ): Promise<number> {
   const pool = getPool();
   const [res]: any = await pool.query(
-    `INSERT INTO assistant_message (conversation_id, role, content, sources_json, had_grounding, created_at)
-     VALUES (?, ?, ?, ?, ?, NOW())`,
+    `INSERT INTO assistant_message (conversation_id, role, content, sources_json, facts_json, had_grounding, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, NOW())`,
     [
       conversationId,
       role,
       content,
       opts.sources && opts.sources.length ? JSON.stringify(opts.sources) : null,
+      opts.facts && opts.facts.length ? JSON.stringify(opts.facts) : null,
       opts.hadGrounding ? 1 : 0,
     ],
   );
@@ -700,6 +703,7 @@ export async function ask(storeId: number, userId: number | null, message: strin
 
   const messageId = await insertMessage(convId, 'assistant', content, {
     sources: grounding.sources,
+    facts: grounding.facts,
     hadGrounding,
   });
 
@@ -711,13 +715,13 @@ export async function ask(storeId: number, userId: number | null, message: strin
     metadata: { conversationId: convId, intent: grounding.intent, hadGrounding, sources: grounding.sources },
   });
 
-  return { conversationId: convId, messageId, content, sources: grounding.sources, hadGrounding, model };
+  return { conversationId: convId, messageId, content, sources: grounding.sources, facts: grounding.facts, hadGrounding, model };
 }
 
 export async function listMessages(storeId: number, conversationId: number): Promise<any[]> {
   const pool = getPool();
   const [rows] = await pool.query<any[]>(
-    `SELECT am.id, am.role, am.content, am.sources_json AS sources,
+    `SELECT am.id, am.role, am.content, am.sources_json AS sources, am.facts_json AS facts,
             am.had_grounding AS hadGrounding, am.linked_action_id AS linkedActionId, am.created_at AS createdAt
        FROM assistant_message am
        JOIN assistant_conversation ac ON ac.id = am.conversation_id

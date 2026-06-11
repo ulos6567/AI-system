@@ -21,9 +21,9 @@ export const usePricingStore = defineStore('pricing', () => {
     }
   }
 
-  async function refreshEvents(storeId: number): Promise<void> {
+  async function refreshEvents(storeId: number, limit = 100): Promise<void> {
     try {
-      const r = await pricingApi.events(storeId);
+      const r = await pricingApi.events(storeId, limit);
       events.value = r.events;
     } catch (err: any) {
       lastError.value = err?.message ?? 'failed';

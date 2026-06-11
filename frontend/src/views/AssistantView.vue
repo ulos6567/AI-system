@@ -66,8 +66,14 @@ watch(() => assistant.messages.length, async () => {
       <div v-for="m in assistant.messages" :key="m.id" class="msg" :class="m.role">
         <div class="bubble">
           <p class="content">{{ m.content }}</p>
+          <div v-if="m.role === 'assistant' && m.facts && m.facts.length" class="facts">
+            <div class="facts-head">📊 근거 데이터</div>
+            <ul class="facts-list">
+              <li v-for="(f, i) in m.facts" :key="i" :class="{ sub: f.startsWith('  ') }">{{ f.trim() }}</li>
+            </ul>
+          </div>
           <div v-if="m.role === 'assistant' && m.sources && m.sources.length" class="sources">
-            <span class="src-label">📎 근거</span>
+            <span class="src-label">📎 출처</span>
             <span v-for="(s, i) in m.sources" :key="i" class="src-chip">{{ sourceText(s) }}</span>
           </div>
           <div v-else-if="m.role === 'assistant' && !m.hadGrounding" class="no-ground">근거 데이터 없음</div>
@@ -104,6 +110,12 @@ watch(() => assistant.messages.length, async () => {
 .msg.user .bubble { background: #533afd; color: #fff; border-bottom-right-radius: 4px; }
 .msg.assistant .bubble { background: #eef3f8; color: #0d253d; border-bottom-left-radius: 4px; }
 .content { margin: 0; white-space: pre-wrap; }
+.facts { margin-top: 0.55rem; background: #fff; border: 1px solid #dfe6ef; border-radius: 8px; padding: 0.5rem 0.7rem; }
+.facts-head { font-size: 0.72rem; font-weight: 700; color: #4434d4; margin-bottom: 0.3rem; }
+.facts-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.15rem; }
+.facts-list li { font-size: 0.8rem; color: #273951; line-height: 1.45; }
+.facts-list li.sub { padding-left: 0.8rem; color: #5a6b82; position: relative; }
+.facts-list li.sub::before { content: '·'; position: absolute; left: 0.25rem; color: #9aa7ba; }
 .sources { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .src-label { font-size: 0.72rem; color: #3f5069; font-weight: 600; }
 .src-chip { font-size: 0.72rem; background: #e7e6fe; color: #2e2b8c; padding: 0.1rem 0.45rem; border-radius: 999px; }

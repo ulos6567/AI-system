@@ -29,6 +29,8 @@ import assistantRouter from './routes/assistant';
 import analyticsExtRouter from './routes/analytics';
 import devicesRouter from './routes/devices';
 import schedulesRouter from './routes/schedules';
+import campusRouter from './routes/campus';
+import cashRouter from './routes/cash';
 import { problemMiddleware } from './middleware/problem';
 import { startAutoOrderScheduler } from './jobs/auto-order';
 import { startSignalPoll } from './jobs/signal-poll';
@@ -95,6 +97,8 @@ export function createApp(): express.Express {
   app.use('/api/stores/:storeId/assistant', assistantRouter);
   app.use('/api/stores/:storeId/devices', devicesRouter);
   app.use('/api/stores/:storeId/schedules', schedulesRouter);
+  app.use('/api/stores/:storeId/campus', campusRouter);
+  app.use('/api/stores/:storeId/cash', cashRouter);
   app.use('/api/pii', consentRouter);
 
   app.use('/api', metricsRouter);

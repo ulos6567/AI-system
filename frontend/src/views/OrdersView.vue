@@ -4,20 +4,40 @@ import { useAuthStore } from '@/stores/auth';
 import { useOrdersStore } from '@/stores/orders';
 import { ordersApi, type OrderItem } from '@/api/orders';
 import { inventoryApi, type InventoryRow } from '@/api/inventory';
+import { storeLocalName } from '@/utils/productName';
+import { loadProductMappings, registeredMasterIds } from '@/utils/productMappings';
+
+// 발주 관리의 상품명은 '상품 코드 관리'의 점포 지정 상품명과 동일하게 표기한다.
+function displayProductName(p: { productMasterId: number; productName: string }): string {
+  return storeLocalName(p.productMasterId, p.productName);
+}
 
 const auth = useAuthStore();
 const orders = useOrdersStore();
 
 const storeId = computed(() => auth.primaryStoreId ?? 1);
 
+// 발주 관리는 '상품 코드 관리'에 등록된 점포 지정 상품(확정 매핑)으로만 구성한다.
+// (단일 출처 utils/productMappings 에서 확정 매핑 집합을 받아 발주 대상으로 제한)
+const registeredIds = ref<Set<number>>(new Set());
+async function loadRegistered(): Promise<void> {
+  try {
+    registeredIds.value = registeredMasterIds(await loadProductMappings(storeId.value));
+  } catch {
+    /* 매핑 로드 실패 시 빈 집합 → 아래 필터에서 안전하게 전체 표시로 폴백 */
+  }
+}
+// 등록 집합이 비어 있으면(로드 실패 등) 안전하게 전체를 보여주고, 있으면 등록 상품으로만 제한
+function isRegistered(productMasterId: number): boolean {
+  return registeredIds.value.size === 0 || registeredIds.value.has(productMasterId);
+}
+
 // 통합: 실시간 재고 현황 (구 '실시간 재고 추적' 메뉴)
 const inventory = ref<InventoryRow[]>([]);
-const invSummary = ref<{ total: number; nearExpiry: number; lowStock: number; zero: number } | null>(null);
 async function loadInventory(): Promise<void> {
   try {
     const r = await inventoryApi.list(storeId.value);
     inventory.value = r.items;
-    invSummary.value = r.summary;
   } catch {
     /* 통합 위젯 실패는 발주 본문에 영향 없음 */
   }
@@ -46,6 +66,25 @@ const cutoffLabel = computed(() => {
   return `${h}시간 ${m}분 남음`;
 });
 
+// 발주 대상: 등록된 점포 지정 상품만
+const visibleForecasts = computed(() =>
+  orders.forecasts.filter((f) => isRegistered(f.productMasterId)),
+);
+// 실시간 재고 현황도 동일하게 등록 상품으로만 제한
+const visibleInventory = computed(() =>
+  inventory.value.filter((it) => isRegistered(it.productMasterId)),
+);
+// 요약 지표도 등록 상품 기준으로 재집계 (표와 합계가 어긋나지 않도록)
+const visibleInvSummary = computed(() => {
+  const rows = visibleInventory.value;
+  return {
+    total: rows.length,
+    nearExpiry: rows.filter((it) => it.daysToExpiry !== null && it.daysToExpiry >= 0 && it.daysToExpiry <= 1).length,
+    lowStock: rows.filter((it) => it.quantity > 0 && it.quantity <= 5).length,
+    zero: rows.filter((it) => it.quantity === 0).length,
+  };
+});
+
 onMounted(async () => {
   recomputeCutoff();
   setInterval(recomputeCutoff, 60_000);
@@ -53,6 +92,7 @@ onMounted(async () => {
     orders.refreshForecasts(storeId.value, targetDate.value),
     orders.refreshOrders(storeId.value),
     loadInventory(),
+    loadRegistered(),
   ]);
   initOrderQty();
 });
@@ -114,25 +154,13 @@ function processLabel(o: { id: number }): string {
   return o.id % 2 === 0 ? '점주 직접 조정' : '시스템 자동 확정';
 }
 
-// 최근 발주 이력 — 발주 제한 요인 (처리 방식과 정합)
-// 시스템 자동 확정(홀수): 제약 없이 처리됨 → 대시
-// 점주 직접 조정(짝수): 제약조건으로 인간이 개입 → 구체적 제약 문구
-function holdReason(o: { id: number }): string {
+// 최근 발주 이력 — 발주 제한 요인(부분 입고 사유)은 '입고완료' 건에만 노출한다.
+// (취소·초안·검토대기 등 아직 입고되지 않은 건은 제한 요인이 있을 수 없으므로 '—')
+function holdReason(o: { id: number; status: string }): string {
+  if (o.status !== 'received') return '—';
   if (o.id % 2 !== 0) return '—';
   const reasons = ['[최소 물류 수량 미달]', '[매대 진열 한도 초과]'];
   return reasons[Math.floor(o.id / 2) % reasons.length];
-}
-
-// 발주 상세 — 입고수량을 처리 방식·발주 제한 요인과 정합되게 표시
-// 시스템 자동 확정(홀수): 제약 없음 → 발주 전량 입고
-// 점주 직접 조정(짝수): 제한 요인에 따라 일부만 입고
-//   · [최소 물류 수량 미달] → 공급 최소수량(5개) 미달 품목은 미입고(0)
-//   · [매대 진열 한도 초과] → 진열 한도(12개)까지만 입고
-function displayReceived(it: { orderedQuantity: number }, orderId: number): number {
-  if (orderId % 2 !== 0) return it.orderedQuantity;
-  const constraint = Math.floor(orderId / 2) % 2;
-  if (constraint === 0) return it.orderedQuantity >= 5 ? it.orderedQuantity : 0;
-  return Math.min(it.orderedQuantity, 12);
 }
 
 // 최종 발주 수량 — 상품별 편집 상태 (예측수량을 기본값으로)
@@ -142,7 +170,7 @@ const flash = ref<string>('');
 
 function initOrderQty(): void {
   const next: Record<number, number> = {};
-  for (const f of orders.forecasts) next[f.productMasterId] = displayQuantity(f);
+  for (const f of visibleForecasts.value) next[f.productMasterId] = displayQuantity(f);
   orderQty.value = next;
   confirmedIds.value = new Set();
 }
@@ -159,13 +187,6 @@ function confirmOne(f: { productMasterId: number; predictedQuantity: number; pro
   confirmedIds.value = new Set(confirmedIds.value).add(f.productMasterId);
   flash.value = `${f.productName} ${qtyOf(f)}개 발주 확정`;
 }
-async function sendAll(): Promise<void> {
-  const total = orders.forecasts.reduce((s, f) => s + qtyOf(f), 0);
-  confirmedIds.value = new Set(orders.forecasts.map((f) => f.productMasterId));
-  flash.value = `오늘의 발주 ${orders.forecasts.length}개 품목(총 ${total}개) 저장 완료`;
-  if (auth.isAdmin) await runAuto();
-}
-
 async function runAuto(): Promise<void> {
   generating.value = true;
   try {
@@ -233,7 +254,7 @@ const statusBadge = (s: string): string => {
       </div>
 
       <div v-if="orders.loading" class="loading">불러오는 중…</div>
-      <div v-else-if="orders.forecasts.length === 0" class="empty">예측 데이터가 없습니다. 시드 거래가 있는지 확인하세요.</div>
+      <div v-else-if="visibleForecasts.length === 0" class="empty">상품 코드 관리에 등록된(확정) 점포 지정 상품이 없습니다.</div>
       <table v-else class="forecast-table">
         <thead>
           <tr>
@@ -246,8 +267,8 @@ const statusBadge = (s: string): string => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="f in orders.forecasts" :key="f.productMasterId">
-            <td>{{ f.productName }}</td>
+          <tr v-for="f in visibleForecasts" :key="f.productMasterId">
+            <td>{{ displayProductName(f) }}</td>
             <td><span class="cat" :data-cat="f.category">{{ catLabel[f.category] ?? f.category }}</span></td>
             <td class="num">{{ displayQuantity(f) }}</td>
             <td><span class="confidence" data-level="high">{{ displayConfidence(f) }}%</span></td>
@@ -274,44 +295,34 @@ const statusBadge = (s: string): string => {
       </table>
 
       <p v-if="flash" class="flash">✓ {{ flash }}</p>
-
-      <div class="table-footer">
-        <button
-          type="button"
-          class="send-all"
-          :disabled="!auth.isAdmin || orders.loading || generating"
-          :title="!auth.isAdmin ? '운영자 권한 필요' : ''"
-          @click="sendAll"
-        >
-          오늘의 발주 데이터 저장
-        </button>
-      </div>
     </section>
 
     <!-- 통합: 실시간 재고 현황 (구 '실시간 재고 추적' 메뉴) -->
     <section class="card">
       <div class="card-header">
         <h3>실시간 재고 현황</h3>
-        <span v-if="invSummary" class="inv-summary">
-          전체 {{ invSummary.total }}
-          · <span class="warn">유통기한 임박 {{ invSummary.nearExpiry }}</span>
-          · <span class="warn">재고 부족 {{ invSummary.lowStock }}</span>
-          · <span class="danger">품절 {{ invSummary.zero }}</span>
+        <span v-if="visibleInventory.length" class="inv-summary">
+          전체 {{ visibleInvSummary.total }}
+          · <span class="warn">유통기한 임박 {{ visibleInvSummary.nearExpiry }}</span>
+          · <span class="warn">재고 부족 {{ visibleInvSummary.lowStock }}</span>
+          · <span class="danger">품절 {{ visibleInvSummary.zero }}</span>
         </span>
       </div>
-      <table v-if="inventory.length" class="forecast-table">
+      <table v-if="visibleInventory.length" class="forecast-table">
         <thead>
           <tr><th>상품</th><th>카테고리</th><th>수량</th><th>위치</th><th>유통기한</th></tr>
         </thead>
         <tbody>
-          <tr v-for="it in inventory" :key="it.id">
-            <td>{{ it.productName }}</td>
+          <tr v-for="it in visibleInventory" :key="it.id">
+            <td>{{ displayProductName(it) }}</td>
             <td><span class="cat" :data-cat="it.category">{{ catLabel[it.category] ?? it.category }}</span></td>
             <td class="stock-status" :class="`stock-${stockStatus(it.quantity).tone}`">[{{ stockStatus(it.quantity).text }}]</td>
             <td class="muted">{{ it.shelfLocation ?? '—' }}</td>
             <td>
+              <!-- 품절 상품은 유통기한을 표시하지 않고 '—' 로 -->
+              <span v-if="it.quantity === 0" class="muted">—</span>
               <span
-                v-if="it.daysToExpiry !== null"
+                v-else-if="it.daysToExpiry !== null"
                 class="dday"
                 :class="{ over: it.daysToExpiry < 0, soon: it.daysToExpiry >= 0 && it.daysToExpiry <= 1 }"
               >{{ it.daysToExpiry < 0 ? `만료 ${-it.daysToExpiry}일` : `D-${it.daysToExpiry}` }}</span>
@@ -377,10 +388,10 @@ const statusBadge = (s: string): string => {
         <thead><tr><th>상품</th><th>카테고리</th><th>발주수량</th><th>입고수량</th></tr></thead>
         <tbody>
           <tr v-for="it in selectedDetail.items" :key="it.id">
-            <td>{{ it.productName }}</td>
+            <td>{{ displayProductName(it) }}</td>
             <td><span class="cat" :data-cat="it.category">{{ catLabel[it.category] ?? it.category }}</span></td>
             <td class="num">{{ it.orderedQuantity }}</td>
-            <td class="num" :class="{ short: displayReceived(it, selectedDetail.id) < it.orderedQuantity }">{{ displayReceived(it, selectedDetail.id) }}</td>
+            <td class="num" :class="{ short: it.receivedQuantity != null && it.receivedQuantity < it.orderedQuantity }">{{ it.receivedQuantity == null ? '미입고' : it.receivedQuantity }}</td>
           </tr>
         </tbody>
       </table>
@@ -460,10 +471,6 @@ th { color: #3f5069; font-weight: 600; background: #f6f9fc; }
 
 /* 전체 전송 CTA */
 .flash { margin: 0.85rem 0 0; color: #15803d; font-size: 0.86rem; font-weight: 600; }
-.table-footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
-.send-all { background: #4434d4; color: #fff; border: none; border-radius: 10px; padding: 0.7rem 1.4rem; font-size: 0.95rem; font-weight: 700; box-shadow: 0 2px 8px rgba(68, 52, 212, 0.25); }
-.send-all:hover { background: #3a2cc0; }
-.send-all:disabled { background: #8a99af; box-shadow: none; cursor: not-allowed; }
 /* 통합: 실시간 재고 현황 */
 .inv-summary { font-size: 0.8rem; color: #64748d; font-weight: 600; }
 .inv-summary .warn { color: #b45309; }

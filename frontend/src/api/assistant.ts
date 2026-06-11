@@ -11,6 +11,7 @@ export interface AssistantAnswer {
   messageId: number;
   content: string;
   sources: GroundingSource[];
+  facts: string[];
   hadGrounding: boolean;
   model: string;
 }
@@ -20,6 +21,7 @@ export interface AssistantMessage {
   role: 'user' | 'assistant';
   content: string;
   sources: GroundingSource[] | null;
+  facts: string[] | null;
   hadGrounding: boolean;
   linkedActionId: number | null;
   createdAt: string;

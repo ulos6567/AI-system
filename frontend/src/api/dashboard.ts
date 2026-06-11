@@ -29,6 +29,14 @@ export interface DashboardResponse {
     revenue: number;
     image: ResolvedImage;
   }[];
+  categoryRanking: {
+    rank: number;
+    productId: number;
+    name: string;
+    units: number;
+    revenue: number;
+    share: number;
+  }[];
 }
 
 export const dashboardApi = {

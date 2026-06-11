@@ -115,6 +115,39 @@ router.get('/', requireAuth, requireStoreScope(), async (req, res) => {
     })),
   );
 
+  // 선택 카테고리 내 상품 판매 순위 (전 품목 · 매출 비중 동반)
+  let categoryRanking: Array<{
+    rank: number;
+    productId: number;
+    name: string;
+    units: number;
+    revenue: number;
+    share: number;
+  }> = [];
+  if (category) {
+    const [rankRows] = await pool.query<any[]>(
+      `SELECT ti.product_master_id AS productId, pm.name AS name,
+              SUM(ti.quantity) AS units,
+              SUM(ti.quantity * ti.unit_price - ti.discount_applied) AS revenue
+         FROM \`transaction\` t
+         JOIN transaction_item ti ON ti.transaction_id = t.id
+         JOIN product_master pm ON pm.id = ti.product_master_id
+        WHERE t.store_id = ? AND t.occurred_at BETWEEN ? AND ? AND pm.category = ?
+        GROUP BY ti.product_master_id, pm.name
+        ORDER BY revenue DESC`,
+      [storeId, fromStr, toStr, category],
+    );
+    const totalRev = rankRows.reduce((s, r) => s + Number(r.revenue), 0) || 1;
+    categoryRanking = rankRows.map((r, i) => ({
+      rank: i + 1,
+      productId: Number(r.productId),
+      name: r.name,
+      units: Number(r.units),
+      revenue: Math.round(Number(r.revenue)),
+      share: Number(r.revenue) / totalRev,
+    }));
+  }
+
   // 폐기율 (inventory_history discard 기반)
   const [discardRows] = await pool.query<any[]>(
     `SELECT COALESCE(-SUM(CASE WHEN ih.reason = 'discard' THEN ih.delta ELSE 0 END), 0) AS discardUnits
@@ -142,6 +175,7 @@ router.get('/', requireAuth, requireStoreScope(), async (req, res) => {
       units: Number(r.units),
     })),
     topProducts,
+    categoryRanking,
   });
 });
 

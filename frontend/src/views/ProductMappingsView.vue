@@ -2,19 +2,8 @@
 import { computed, onMounted, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/api/client';
-
-interface MappingRow {
-  id: number;
-  localCode: string;
-  localName: string;
-  productMasterId: number | null;
-  productName: string | null;
-  category: string | null;
-  barcode: string | null;
-  confidence: number;
-  status: 'auto' | 'confirmed' | 'rejected' | 'pending';
-  updatedAt: string;
-}
+import { storeLocalName } from '@/utils/productName';
+import { type MappingRow, loadProductMappings } from '@/utils/productMappings';
 
 const auth = useAuthStore();
 const storeId = computed(() => auth.primaryStoreId ?? 1);
@@ -26,53 +15,12 @@ const loading = ref(false);
 const reassignId = ref<number | null>(null);
 const reassignTarget = ref<number | null>(null);
 
-// 캔버스 '파편화된 등록 방식' 시연용 — 점주가 제각각 등록한 날것의 데이터 예시.
-// 확정 완료에만 쏠린 mock 분포를 AI 자동 매핑/검토 대기로 분산시켜 '인간의 최종 판단'을 드러낸다.
-const fragmentedExamples: Array<{
-  localName: string;
-  productName: string | null;
-  category: string | null;
-  confidence: number;
-  status: 'auto' | 'pending' | 'rejected';
-  clearMaster?: boolean; // 제외된 비매핑(쓰레기) 행은 마스터 연결을 끊는다
-}> = [
-  // AI 자동 매핑 (auto) — AI가 높은 신뢰도로 자동 연결, 점주 확정 대기
-  { localName: '코카제로캔', productName: '코카콜라 제로 250ml', category: 'beverage', confidence: 0.97, status: 'auto' },
-  { localName: '포카칩', productName: '포카칩 오리지널 66g', category: 'snack', confidence: 0.96, status: 'auto' },
-  { localName: '박카스', productName: '박카스D 100ml', category: 'beverage', confidence: 0.95, status: 'auto' },
-  // 검토 대기 (pending) — 신뢰도가 낮아 점주의 최종 판단이 필요
-  { localName: '신라면컵', productName: '신라면 큰사발면', category: 'instant', confidence: 0.63, status: 'pending' },
-  { localName: '딸기우유', productName: '딸기우유 240ml', category: 'beverage', confidence: 0.59, status: 'pending' },
-  // 제외됨 (rejected) — 상품이 아니거나 매핑 불가하여 점주가 제외 처리
-  { localName: '비닐봉투(대)', productName: null, category: null, confidence: 0.08, status: 'rejected', clearMaster: true },
-  { localName: '3색볼펜', productName: null, category: null, confidence: 0.05, status: 'rejected', clearMaster: true },
-];
-
-// 확정 완료 행 일부를 파편화 예시로 치환 → counts(검토 대기/AI 자동 매핑/확정 완료/제외됨)가 자연 분산
-function applyMockDistribution(rows: MappingRow[]): MappingRow[] {
-  const out = rows.map((r) => ({ ...r }));
-  let ei = 0;
-  for (const row of out) {
-    if (ei >= fragmentedExamples.length) break;
-    if (row.status === 'confirmed' && row.productMasterId != null) {
-      const ex = fragmentedExamples[ei++];
-      row.localName = ex.localName;
-      row.productName = ex.productName;
-      row.category = ex.category;
-      row.confidence = ex.confidence;
-      row.status = ex.status;
-      if (ex.clearMaster) row.productMasterId = null;
-    }
-  }
-  return out;
-}
-
 async function load(): Promise<void> {
   loading.value = true;
   try {
     // 전체를 한 번에 받아 클라이언트에서 필터링 — counts·필터·주입 예시가 항상 정합되도록.
-    const r = await api<{ mappings: MappingRow[] }>(`/stores/${storeId.value}/product-mappings`);
-    mappings.value = applyMockDistribution(r.mappings);
+    // 로딩·모킹 분포는 발주 관리와 공유하는 단일 출처(utils/productMappings)를 사용한다.
+    mappings.value = await loadProductMappings(storeId.value);
   } finally {
     loading.value = false;
   }
@@ -148,41 +96,12 @@ const catLabel: Record<string, string> = {
   snack: '간식',
 };
 
-// '리얼 데이터' 연출: 점포가 제각각 등록한 날것의 로컬 이름(마스터 매핑은 표준 명칭 유지)
-const localNameOverride: Record<number, string> = {
-  24: '햄치즈샌드(현장등록)', // 샌드위치 햄치즈
-  1: '삼다수500', //          삼다수 500ml
-  2: '코카500 PET', //        코카콜라 500ml
-  3: '코카제로500', //        제로콜라 500ml
-};
-// 점포 지정 상품명 표기 정제: 점포가 등록한 명칭을 짧고 일관된 표기로 치환
-// (표준 마스터 상품명은 canonical 값 그대로 유지)
-const localNameRenames: Record<string, string> = {
-  '코카500 PET': '코카콜라500미리',
-  '아메리카노 컵': '아메리카노',
-  '바나나우유 240ml': '바나나우유',
-  '딸기우유 240ml': '딸기우유',
-  '포카칩 오리지널': '포카칩',
-  '삼각김밥 참치': '참치 삼각김밥',
-  '삼각김밥 전주비빔': '전주비빔 삼각김밥',
-  '컵라면 신라면': '신라면 컵',
-  '컵라면 진라면': '진라면 컵',
-  '아이스크림 메로나': '메로나 아이스',
-  '아이스크림 비비빅': '비비빅 아이스',
-  '에너지바 단백질': '단백질 에너지바',
-  '비타민워터 500ml': '비타민워터',
-  '녹차 티백 20입': '녹차 티백',
-  '핫바 매콤': '매콤 핫바',
-};
-
+// '리얼 데이터' 연출: 점포 지정 상품명 표기 규칙은 '발주 관리'와 공유한다(utils/productName).
 function displayLocalName(m: MappingRow): string {
   // AI 자동 매핑/검토 대기/제외됨 행은 점주가 등록한 파편화된 원본 명칭을 그대로 노출
   if (m.status === 'auto' || m.status === 'pending' || m.status === 'rejected') return m.localName;
-  const base =
-    m.productMasterId != null && localNameOverride[m.productMasterId]
-      ? localNameOverride[m.productMasterId]
-      : m.localName;
-  return localNameRenames[base] ?? base;
+  // 확정 완료 행은 발주 관리와 동일한 점포 지정 상품명을 노출(마스터 표준명 기준으로 변환)
+  return storeLocalName(m.productMasterId, m.productName ?? m.localName);
 }
 
 // 신뢰도: 확정 완료는 결정적으로 높게(86~97%), 자동/검토/제외 행은 실제 AI 점수(낮은 신뢰도) 노출

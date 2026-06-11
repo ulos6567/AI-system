@@ -29,15 +29,6 @@ const RULES: RuleSeed[] = [
   },
   {
     store: 1,
-    name: '우천 시 따뜻한 음료 15% 할인',
-    triggerType: 'weather',
-    triggerConfig: { min_rain_mm: 1, product_master_ids: [4, 5] },
-    actionType: 'percent_off',
-    actionConfig: { percent: 15, duration_hours: 6 },
-    active: 1,
-  },
-  {
-    store: 1,
     name: '주말 저녁 도시락·김밥 25% 타임세일',
     triggerType: 'schedule',
     triggerConfig: { days_of_week: ['sat', 'sun'], start_hour: 18, end_hour: 21, product_master_ids: [11, 12, 13, 14, 15] },

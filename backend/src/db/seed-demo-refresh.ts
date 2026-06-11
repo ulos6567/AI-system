@@ -110,20 +110,22 @@ async function seedInventory(storeId: number, today: Date): Promise<void> {
   const shelfPrefix = storeId === 1 ? 'A' : storeId === 2 ? 'B' : 'C';
   for (const id of PRODUCT_IDS) {
     const p = PRODUCTS[id];
-    // 유통기한 — 신선식품일수록 짧게, 일부는 오늘/내일 임박
+    // 유통기한 — 신선식품일수록 짧게. 단, 만료(과거) 상품은 만들지 않고
+    // 대부분 임박까지 최소 3일 이상 버퍼를 둔다(신선식품도 최소 D-3).
     let expires: string | null;
-    if (p.shelf <= 2) expires = ymd(addDays(today, randInt(0, 2)));
-    else if (p.shelf <= 14) expires = ymd(addDays(today, randInt(2, 10)));
+    if (p.shelf <= 2) expires = ymd(addDays(today, randInt(4, 7)));
+    else if (p.shelf <= 14) expires = ymd(addDays(today, randInt(5, 12)));
     else if (p.shelf <= 120) expires = ymd(addDays(today, randInt(20, 80)));
     else expires = Math.random() < 0.4 ? null : ymd(addDays(today, randInt(120, 340)));
 
-    // 수량 — 신선식품은 적게, 가끔 저재고/결품
+    // 수량 — 신선식품은 적게, 가끔 저재고/결품.
+    // 단, 정상 재고 품목은 기부 필요 수량을 충분히 웃돌도록 넉넉히(잉여 재고 > 필요 수량) 둔다.
     let qty: number;
     const roll = Math.random();
     if (roll < 0.08) qty = 0; // 결품
     else if (roll < 0.22) qty = randInt(1, 5); // 저재고
-    else if (p.shelf <= 2) qty = randInt(8, 35);
-    else qty = randInt(30, 140);
+    else if (p.shelf <= 2) qty = randInt(28, 55); // 신선식품도 정상 재고는 넉넉히
+    else qty = randInt(35, 140);
 
     rows.push([storeId, id, qty, `${shelfPrefix}-${String(id).padStart(2, '0')}`, expires]);
   }

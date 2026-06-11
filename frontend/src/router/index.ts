@@ -30,6 +30,8 @@ const router = createRouter({
         { path: 'transactions', name: 'transactions', component: () => import('@/views/TransactionsView.vue'), meta: { title: '매출 현황' } },
         { path: 'pricing/events', name: 'pricing-events', component: () => import('@/views/PricingEventsView.vue'), meta: { title: '가격 변경 이력' } },
         { path: 'schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue'), meta: { title: '근무 일정' } },
+        { path: 'campus', name: 'campus', component: () => import('@/views/CampusEventsView.vue'), meta: { title: '대학 축제·시험 캘린더' } },
+        { path: 'cash', name: 'cash', component: () => import('@/views/CashCountView.vue'), meta: { title: '시재 점검' } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

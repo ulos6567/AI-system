@@ -31,8 +31,10 @@ const navGroups = [
     label: '매장 관리',
     items: [
       { name: 'orders',         label: '발주 관리',  icon: '📦' },
+      { name: 'campus',         label: '대학 축제·시험 캘린더', icon: '🎓' },
       { name: 'pricing-rules',  label: '실시간 가격 설정', icon: '💲' },
       { name: 'mappings',       label: '상품 코드 관리',     icon: '🔗' },
+      { name: 'cash',           label: '시재 점검', icon: '💵' },
       { name: 'local-delivery', label: '로컬 상생 배송 관리', icon: '🚚' },
     ],
   },
