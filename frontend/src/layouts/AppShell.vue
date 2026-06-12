@@ -27,6 +27,7 @@ const navGroups = [
       { name: 'sales-patterns', label: '판매 패턴 분석', icon: '📊' },
       { name: 'insights',  label: '오늘의 점포 운영 현황', icon: '💡' },
       { name: 'assistant', label: 'AI 점포 매니저 어시스턴트', icon: '🤖' },
+      { name: 'transactions', label: '매출 현황', icon: '💳' },
     ],
   },
   {
@@ -34,8 +35,10 @@ const navGroups = [
     items: [
       { name: 'orders',         label: '발주 관리',  icon: '📦' },
       { name: 'pricing-rules',  label: '실시간 가격 설정', icon: '💲' },
+      { name: 'pricing-events', label: '가격 변경 이력', icon: '📈' },
       { name: 'mappings',       label: '상품 코드 관리',     icon: '🔗' },
       { name: 'local-delivery', label: '로컬 상생 배송 관리', icon: '🚚' },
+      { name: 'schedule',       label: '근무 일정', icon: '🗓️' },
     ],
   },
 ];

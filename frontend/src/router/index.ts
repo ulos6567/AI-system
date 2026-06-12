@@ -27,7 +27,7 @@ const router = createRouter({
         { path: 'self-checkout', name: 'self-checkout', component: () => import('@/views/SelfCheckoutMockView.vue'), meta: { title: 'AI 결제 시뮬레이터' } },
         { path: 'mappings', name: 'mappings', component: () => import('@/views/ProductMappingsView.vue'), meta: { title: '상품 코드 관리' } },
         { path: 'local-delivery', name: 'local-delivery', component: () => import('@/views/LocalDeliveryView.vue'), meta: { title: '로컬 상생 배송 관리' } },
-        // 메뉴에서는 빠졌지만 URL 접근은 유지(기능 보존): 매출 현황·가격 변경 이력·근무 일정
+        // 매출 현황·가격 변경 이력·근무 일정 — 메인 메뉴(AppShell)에 노출됨
         { path: 'transactions', name: 'transactions', component: () => import('@/views/TransactionsView.vue'), meta: { title: '매출 현황' } },
         { path: 'pricing/events', name: 'pricing-events', component: () => import('@/views/PricingEventsView.vue'), meta: { title: '가격 변경 이력' } },
         { path: 'schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue'), meta: { title: '근무 일정' } },
