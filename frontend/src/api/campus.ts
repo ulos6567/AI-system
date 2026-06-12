@@ -67,6 +67,14 @@ export interface CampusPlay {
     discountPct: number;
     categories: string[];
     window: string;
+    period: string;
+    mechanic: string;
+    bundles: string[];
+    targetItems: string[];
+    channels: string[];
+    expectedUpliftPct: number;
+    tip: string;
+    discountNote: string | null;
   } | null;
   inventoryTargets: InventoryTarget[];
 }
@@ -84,6 +92,10 @@ export interface PromotePayload {
   discountPct: number;
   startDate: string;
   endDate: string;
+  mechanic?: string;
+  bundles?: string[];
+  channels?: string[];
+  expectedUpliftPct?: number;
 }
 
 export interface InventoryAdjustPayload {
@@ -101,8 +113,11 @@ export const campusApi = {
   calendar(storeId: number) {
     return api<CalendarResponse>(`/stores/${storeId}/campus/calendar`);
   },
-  recommendations(storeId: number) {
-    return api<{ storeId: number; plays: CampusPlay[] }>(`/stores/${storeId}/campus/recommendations`);
+  recommendations(storeId: number, universityIds?: number[]) {
+    const qs = universityIds && universityIds.length ? `?universityIds=${universityIds.join(',')}` : '';
+    return api<{ storeId: number; scope: 'nearby' | 'filtered'; plays: CampusPlay[] }>(
+      `/stores/${storeId}/campus/recommendations${qs}`,
+    );
   },
   promote(storeId: number, payload: PromotePayload) {
     return api<{ ok: boolean; eventLogId: number; promotion: PromotePayload }>(

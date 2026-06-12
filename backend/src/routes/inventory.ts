@@ -37,16 +37,21 @@ router.get('/', requireAuth, requireStoreScope(), async (req, res) => {
   }
 
   const pool = getPool();
+  // 동일 상품이 여러 입고 배치(expires_at 상이)로 분리 저장되므로 상품 단위로 합산하여 1행으로 표시.
+  // 수량은 합계, 유통기한은 가장 임박한(가장 이른) 배치 기준으로 노출한다.
   const [rows] = await pool.query<any[]>(
-    `SELECT i.id, i.product_master_id AS productMasterId, pm.name AS productName,
+    `SELECT MIN(i.id) AS id, i.product_master_id AS productMasterId, pm.name AS productName,
             pm.category, pm.temp_zone AS tempZone, pm.shelf_life_days AS shelfLifeDays,
-            i.quantity, i.shelf_location AS shelfLocation, i.expires_at AS expiresAt,
-            DATEDIFF(i.expires_at, CURRENT_DATE) AS daysToExpiry,
-            i.updated_at AS updatedAt
+            CAST(SUM(i.quantity) AS SIGNED) AS quantity,
+            MIN(i.shelf_location) AS shelfLocation,
+            MIN(i.expires_at) AS expiresAt,
+            DATEDIFF(MIN(i.expires_at), CURRENT_DATE) AS daysToExpiry,
+            MAX(i.updated_at) AS updatedAt
        FROM inventory i
        JOIN product_master pm ON pm.id = i.product_master_id
       WHERE ${wheres.join(' AND ')}
-      ORDER BY (i.expires_at IS NULL), i.expires_at ASC, pm.name ASC
+      GROUP BY i.product_master_id, pm.name, pm.category, pm.temp_zone, pm.shelf_life_days
+      ORDER BY (MIN(i.expires_at) IS NULL), MIN(i.expires_at) ASC, pm.name ASC
       LIMIT 500`,
     args,
   );

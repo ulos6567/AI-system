@@ -334,23 +334,36 @@ INSERT IGNORE INTO university (name, short_name, region) VALUES
 -- 데모 기준일(2026-06-11) 전후로 배치: 중간고사(종료)·기말고사(진행/예정)·봄축제(종료)·여름방학(예정)
 DELETE FROM academic_event WHERE university_id > 7;
 
--- 1학기 기말고사 (시험 캘린더 — 대학별로 6/4~6/17 사이 시작, 12일간 → 다수 진행중)
+-- 1학기 기말고사 (대학별로 시작일·기간이 다르게 — 6/8~6/17 시작, 8~12일 진행).
+--   시험기간에는 기숙사 통금이 풀린다(연장 01~03시 또는 24시간 개방). 통금이 늦을수록 심야 피크도 늦어진다.
 INSERT INTO academic_event (university_id, event_type, title, start_date, end_date, curfew_time, peak_hours, traffic_level, note)
 SELECT u.id, 'exam', '1학기 기말고사',
-       DATE_ADD('2026-06-04', INTERVAL (u.id % 14) DAY),
-       DATE_ADD('2026-06-04', INTERVAL ((u.id % 14) + 12) DAY),
-       '24:00:00', '19:00-24:00', 'high',
-       '시험기간 — 카페인 음료·간편식·컵라면 심야 수요 증가'
+       DATE_ADD('2026-06-08', INTERVAL ((u.id % 2) * 7 + (u.id % 3)) DAY),
+       DATE_ADD(DATE_ADD('2026-06-08', INTERVAL ((u.id % 2) * 7 + (u.id % 3)) DAY), INTERVAL (8 + (u.id % 5)) DAY),
+       CASE u.id % 4 WHEN 0 THEN '01:00:00' WHEN 1 THEN '02:00:00' WHEN 2 THEN '03:00:00' ELSE NULL END,
+       CASE u.id % 4 WHEN 0 THEN '20:00-01:00' WHEN 1 THEN '20:00-02:00' WHEN 2 THEN '21:00-03:00' ELSE '19:00-24:00' END,
+       'high',
+       CASE u.id % 4
+         WHEN 0 THEN '시험기간 통금 01시 연장 — 심야 카페인·간편식·컵라면 수요 급증 (피크 20–01시)'
+         WHEN 1 THEN '시험기간 통금 02시 연장 — 심야 카페인·간편식·컵라면 수요 급증 (피크 20–02시)'
+         WHEN 2 THEN '시험기간 통금 03시 연장 — 심야 카페인·간편식·컵라면 수요 급증 (피크 21–03시)'
+         ELSE '시험기간 기숙사 24시간 개방(통금 해제) — 심야 학습 수요 급증 (피크 19–24시)'
+       END
   FROM university u
  WHERE u.id > 7;
 
--- 1학기 중간고사 (종료 — 4월)
+-- 1학기 중간고사 (종료 — 4월, 대학별 상이). 중간고사도 통금 연장/해제 적용.
 INSERT INTO academic_event (university_id, event_type, title, start_date, end_date, curfew_time, peak_hours, traffic_level, note)
 SELECT u.id, 'exam', '1학기 중간고사',
-       DATE_ADD('2026-04-13', INTERVAL (u.id % 10) DAY),
-       DATE_ADD('2026-04-13', INTERVAL ((u.id % 10) + 11) DAY),
-       NULL, '19:00-23:00', 'high',
-       '중간고사 기간 — 카페인·간편식 수요 증가'
+       DATE_ADD('2026-04-13', INTERVAL ((u.id % 2) * 7 + (u.id % 3)) DAY),
+       DATE_ADD(DATE_ADD('2026-04-13', INTERVAL ((u.id % 2) * 7 + (u.id % 3)) DAY), INTERVAL (5 + (u.id % 4)) DAY),
+       CASE u.id % 4 WHEN 0 THEN '01:00:00' WHEN 1 THEN '02:00:00' WHEN 2 THEN '03:00:00' ELSE NULL END,
+       CASE u.id % 4 WHEN 0 THEN '20:00-01:00' WHEN 1 THEN '20:00-02:00' WHEN 2 THEN '21:00-03:00' ELSE '19:00-24:00' END,
+       'high',
+       CASE u.id % 4
+         WHEN 3 THEN '중간고사 기간 기숙사 24시간 개방(통금 해제) — 심야 카페인·간편식 수요 증가'
+         ELSE '중간고사 기간 통금 연장 — 심야 카페인·간편식 수요 증가'
+       END
   FROM university u
  WHERE u.id > 7;
 

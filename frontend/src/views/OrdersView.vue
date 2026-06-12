@@ -156,11 +156,28 @@ function processLabel(o: { id: number }): string {
 
 // 최근 발주 이력 — 발주 제한 요인(부분 입고 사유)은 '입고완료' 건에만 노출한다.
 // (취소·초안·검토대기 등 아직 입고되지 않은 건은 제한 요인이 있을 수 없으므로 '—')
-function holdReason(o: { id: number; status: string }): string {
-  if (o.status !== 'received') return '—';
-  if (o.id % 2 !== 0) return '—';
-  const reasons = ['[최소 물류 수량 미달]', '[매대 진열 한도 초과]'];
-  return reasons[Math.floor(o.id / 2) % reasons.length];
+//   · [최소 물류 수량 미달] — 발주량이 공급사 최소 물류(MOQ) 단위에 못 미쳐 부분 입고
+//   · [매대 진열 공간 부족] — 발주량이 매대 진열 가능 수량을 넘어 한도까지만 입고
+// 제한 요인이 있는 '입고완료' 건에 두 사유를 라운드로빈으로 분배해, 좁은 화면(최근 N건)에서도
+// 두 사유가 고르게 노출되도록 한다. (id 산술 분배는 입고 건이 특정 잔여값에 몰려 한쪽만 보이는 문제가 있었음)
+const HOLD_REASONS = ['[최소 물류 수량 미달]', '[매대 진열 공간 부족]'];
+const holdReasonMap = computed<Record<number, string>>(() => {
+  const map: Record<number, string> = {};
+  let k = 0;
+  for (const o of orders.orders) {
+    // '입고완료' 건에만 부분 입고 사유를 부여하고, 두 사유를 라운드로빈으로 번갈아 배정한다.
+    // (점포당 입고완료 건수가 적어, 짝수 id 등으로 더 걸러내면 한쪽 사유만 노출되던 문제를 제거)
+    if (o.status !== 'received') {
+      map[o.id] = '—';
+      continue;
+    }
+    map[o.id] = HOLD_REASONS[k % HOLD_REASONS.length];
+    k += 1;
+  }
+  return map;
+});
+function holdReason(o: { id: number }): string {
+  return holdReasonMap.value[o.id] ?? '—';
 }
 
 // 최종 발주 수량 — 상품별 편집 상태 (예측수량을 기본값으로)

@@ -21,6 +21,9 @@ const loading = ref(false);
 const lastError = ref<string | null>(null);
 const actionMsg = ref<{ kind: 'ok' | 'err'; text: string } | null>(null);
 const busyKey = ref<string | null>(null);
+// AI 추천: 지역 필터 연동 로딩/범위 상태
+const recoLoading = ref(false);
+const recoScope = ref<'nearby' | 'filtered'>('nearby');
 
 // 플레이별 편집중 재고 수량: key=`${eventId}:${inventoryId}` → 수량
 const editQty = reactive<Record<string, number>>({});
@@ -110,26 +113,53 @@ const filteredEvents = computed(() => {
 const displayEvents = computed(() => filteredEvents.value.slice(0, EVENT_LIMIT));
 const eventOverflow = computed(() => Math.max(0, filteredEvents.value.length - EVENT_LIMIT));
 
+// 편집 버퍼를 추천 수량으로 초기화
+function syncEditBuffer(): void {
+  for (const key of Object.keys(editQty)) delete editQty[key];
+  for (const p of plays.value) {
+    for (const t of p.inventoryTargets) {
+      editQty[qKey(p.eventId, t.inventoryId)] = t.suggestedQty;
+    }
+  }
+}
+
+// 현재 추천이 보고 있는 지역 라벨(화면 표시용)
+const recoScopeLabel = computed(() => {
+  if (recoScope.value !== 'filtered') return '점포 인근 연계 대학';
+  const parts = [regionFilter.value !== '전체' ? regionFilter.value : '', districtFilter.value !== '전체' ? districtFilter.value : ''].filter(Boolean);
+  const region = parts.join(' ');
+  if (search.value.trim()) return `${region ? region + ' · ' : ''}"${search.value.trim()}" 검색`;
+  return region || '선택 지역';
+});
+
+// 추천만 (재)조회 — 지역 필터가 적용돼 있으면 해당 지역 대학 기준으로 추천을 받는다.
+async function loadRecommendations(): Promise<void> {
+  recoLoading.value = true;
+  try {
+    const ids = isFiltering.value ? filteredUniversities.value.slice(0, 25).map((u) => u.id) : undefined;
+    const r = await campusApi.recommendations(storeId.value, ids);
+    plays.value = r.plays;
+    recoScope.value = r.scope;
+    syncEditBuffer();
+  } catch (err: any) {
+    actionMsg.value = { kind: 'err', text: `추천 조회 실패: ${err?.message ?? 'error'}` };
+  } finally {
+    recoLoading.value = false;
+  }
+}
+
 async function load(): Promise<void> {
   loading.value = true;
   lastError.value = null;
   try {
-    const [u, c, r] = await Promise.all([
+    const [u, c] = await Promise.all([
       campusApi.universities(storeId.value),
       campusApi.calendar(storeId.value),
-      campusApi.recommendations(storeId.value),
     ]);
     universities.value = u.universities;
     events.value = c.events;
     summary.value = c.summary;
-    plays.value = r.plays;
-    // 편집 버퍼를 추천 수량으로 초기화
-    for (const key of Object.keys(editQty)) delete editQty[key];
-    for (const p of plays.value) {
-      for (const t of p.inventoryTargets) {
-        editQty[qKey(p.eventId, t.inventoryId)] = t.suggestedQty;
-      }
-    }
+    await loadRecommendations();
   } catch (err: any) {
     lastError.value = err?.message ?? 'failed';
   } finally {
@@ -139,9 +169,22 @@ async function load(): Promise<void> {
 
 onMounted(load);
 
+// 지역·검색 필터를 바꾸면 추천도 그 지역 기준으로 자동 전환(검색 입력은 디바운스).
+let recoTimer: ReturnType<typeof setTimeout> | null = null;
+watch([regionFilter, districtFilter, search], () => {
+  if (loading.value) return; // 최초 로딩은 load()가 직접 호출
+  if (recoTimer) clearTimeout(recoTimer);
+  recoTimer = setTimeout(() => void loadRecommendations(), 250);
+});
+
 function dday(daysUntilStart: number): string {
   if (daysUntilStart <= 0) return '진행중';
   return `D-${daysUntilStart}`;
+}
+// 시험기간에는 통금이 풀린다 — 연장(시간 표시) 또는 24시간 개방(해제)로 명확히 표기
+function curfewText(ev: { eventType: string; curfewTime: string | null }): string {
+  if (ev.eventType === 'exam') return ev.curfewTime ? `🔓 ${ev.curfewTime} 연장` : '🔓 해제(24h)';
+  return ev.curfewTime ?? '없음';
 }
 
 function changedTargets(p: CampusPlay): Array<{ inventoryId: number; quantity: number }> {
@@ -166,6 +209,10 @@ async function promote(p: CampusPlay): Promise<void> {
       discountPct: p.promotion.discountPct,
       startDate: p.startDate,
       endDate: p.endDate,
+      mechanic: p.promotion.mechanic,
+      bundles: p.promotion.bundles,
+      channels: p.promotion.channels,
+      expectedUpliftPct: p.promotion.expectedUpliftPct,
     });
     actionMsg.value = {
       kind: 'ok',
@@ -313,7 +360,7 @@ async function applyInventory(p: CampusPlay): Promise<void> {
               <td>{{ e.title }}</td>
               <td class="muted">{{ e.startDate.slice(5) }} ~ {{ e.endDate.slice(5) }}</td>
               <td>{{ e.status === 'past' ? '종료' : dday(e.daysUntilStart) }}</td>
-              <td :class="{ 'curfew-none': !e.curfewTime }">{{ e.curfewTime ?? '없음' }}</td>
+              <td :class="{ 'curfew-lift': e.eventType === 'exam' }">{{ curfewText(e) }}</td>
               <td class="muted">{{ e.peakHours ?? '—' }}</td>
               <td><span class="traffic" :data-lv="e.trafficLevel">{{ e.trafficLevel }}</span></td>
               <td>
@@ -335,7 +382,21 @@ async function applyInventory(p: CampusPlay): Promise<void> {
           <span class="hint">진행중·7일 이내 임박 일정 기준</span>
         </div>
 
-        <div v-if="!plays.length" class="empty">현재 추천할 진행중·임박 일정이 없습니다.</div>
+        <div class="reco-scope">
+          <span class="scope-badge" :class="recoScope === 'filtered' ? 'filtered' : 'nearby'">
+            {{ recoScope === 'filtered' ? '📍 지역 선택' : '🏪 인근 연계' }}
+          </span>
+          <span class="scope-text">현재 추천 기준: <strong>{{ recoScopeLabel }}</strong></span>
+          <span v-if="recoLoading" class="scope-loading">· 갱신 중…</span>
+          <span v-else-if="recoScope === 'filtered'" class="scope-hint">· 위 지역 필터를 바꾸면 해당 지역 대학 기준으로 자동 전환됩니다</span>
+        </div>
+
+        <div v-if="recoLoading && !plays.length" class="empty">지역 추천 불러오는 중…</div>
+        <div v-else-if="!plays.length" class="empty">
+          {{ recoScope === 'filtered'
+            ? '선택한 지역에 진행중·임박(7일 이내) 학사 일정이 없습니다. 다른 지역·대학을 선택해 보세요.'
+            : '현재 추천할 진행중·임박 일정이 없습니다.' }}
+        </div>
 
         <div v-for="p in plays" :key="p.eventId" class="play">
           <div class="play-head">
@@ -345,29 +406,66 @@ async function applyInventory(p: CampusPlay): Promise<void> {
               <span class="status" :class="'s-' + p.status">{{ p.status === 'active' ? '진행중' : dday(p.daysUntilStart) }}</span>
             </div>
             <div class="play-meta">
-              <span>🌙 통금 {{ p.curfewTime ?? '없음' }}</span>
+              <span>🌙 통금 {{ curfewText(p) }}</span>
               <span>⏰ 피크 {{ p.peakHours ?? '—' }}</span>
               <span>📈 유동 {{ p.trafficLevel }}</span>
             </div>
           </div>
           <p class="headline">{{ p.headline }}</p>
 
-          <!-- 이벤트(프로모션) 추진 -->
+          <!-- 이벤트(프로모션) 추진 — 상세 추진안 -->
           <div v-if="p.promotion" class="promo">
-            <div class="promo-info">
-              <span class="promo-tag">프로모션 제안</span>
-              <strong>{{ p.promotion.label }}</strong>
-              <span class="promo-disc">-{{ p.promotion.discountPct }}%</span>
-              <span class="promo-cats">대상: {{ p.promotion.categories.join(', ') }}</span>
-              <span class="promo-win">적용 시간대: {{ p.promotion.window }}</span>
+            <div class="promo-top">
+              <div class="promo-headline">
+                <span class="promo-tag">프로모션 제안</span>
+                <strong>{{ p.promotion.label }}</strong>
+                <span class="promo-disc">-{{ p.promotion.discountPct }}%</span>
+                <span class="promo-uplift">기대 매출 +{{ p.promotion.expectedUpliftPct }}%</span>
+              </div>
+              <button
+                class="btn primary"
+                :disabled="!canWrite || busyKey === `promo:${p.eventId}`"
+                @click="promote(p)"
+              >
+                {{ busyKey === `promo:${p.eventId}` ? '추진 중…' : '이벤트 추진' }}
+              </button>
             </div>
-            <button
-              class="btn primary"
-              :disabled="!canWrite || busyKey === `promo:${p.eventId}`"
-              @click="promote(p)"
-            >
-              {{ busyKey === `promo:${p.eventId}` ? '추진 중…' : '이벤트 추진' }}
-            </button>
+
+            <p class="promo-mechanic">💡 {{ p.promotion.mechanic }}</p>
+            <p v-if="p.promotion.discountNote" class="promo-note">↳ {{ p.promotion.discountNote }}</p>
+
+            <div class="promo-grid">
+              <div class="promo-field">
+                <span class="pf-label">🎯 핵심 타깃</span>
+                <div class="pf-tags">
+                  <span v-for="t in p.promotion.targetItems" :key="t" class="pf-tag">{{ t }}</span>
+                </div>
+              </div>
+              <div class="promo-field">
+                <span class="pf-label">📦 추천 묶음 구성</span>
+                <div class="pf-tags">
+                  <span v-for="b in p.promotion.bundles" :key="b" class="pf-tag bundle">{{ b }}</span>
+                </div>
+              </div>
+              <div class="promo-field">
+                <span class="pf-label">📣 노출 채널</span>
+                <div class="pf-tags">
+                  <span v-for="c in p.promotion.channels" :key="c" class="pf-tag channel">{{ c }}</span>
+                </div>
+              </div>
+              <div class="promo-field">
+                <span class="pf-label">🗂 대상 카테고리</span>
+                <div class="pf-tags">
+                  <span v-for="c in p.promotion.categories" :key="c" class="pf-tag">{{ c }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="promo-foot">
+              <span>🗓 기간 {{ p.promotion.period }}</span>
+              <span>⏰ 적용 시간대 {{ p.promotion.window }}</span>
+            </div>
+            <p class="promo-tip">📌 {{ p.promotion.tip }}</p>
           </div>
 
           <!-- 재고 수량 조정 -->
@@ -485,6 +583,7 @@ h3 { margin: 0; font-size: 1.05rem; }
 .cal-table th { background: #f6f9fc; color: #3f5069; font-weight: 600; }
 .cal-table tr.past { opacity: 0.5; }
 .curfew-none { color: #b45309; }
+.curfew-lift { color: #15803d; font-weight: 600; white-space: nowrap; }
 
 .cat { padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.76rem; background: #eef3f8; color: #3f5069; white-space: nowrap; }
 .cat.c-festival { background: #fce7f3; color: #be185d; }
@@ -502,6 +601,15 @@ h3 { margin: 0; font-size: 1.05rem; }
 .s-upcoming { background: #fef9c3; color: #a16207; }
 .s-past { background: #f1f5f9; color: #94a3b8; }
 
+.reco-scope { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.9rem;
+  background: #f8fafc; border: 1px solid #eef3f8; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.84rem; color: #475569; }
+.scope-badge { font-size: 0.74rem; font-weight: 700; padding: 0.12rem 0.55rem; border-radius: 999px; }
+.scope-badge.nearby { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.scope-badge.filtered { background: #eef2ff; color: #4434d4; border: 1px solid #c7d2fe; }
+.scope-text strong { color: #0d253d; }
+.scope-loading { color: #4434d4; font-weight: 600; }
+.scope-hint { color: #8a99af; font-size: 0.8rem; }
+
 .play { border: 1px solid #e7edf4; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
 .play:last-child { margin-bottom: 0; }
 .play-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
@@ -509,12 +617,25 @@ h3 { margin: 0; font-size: 1.05rem; }
 .play-meta { display: flex; gap: 0.85rem; color: #475569; font-size: 0.82rem; flex-wrap: wrap; }
 .headline { margin: 0.55rem 0 0.85rem; color: #334155; font-size: 0.9rem; }
 
-.promo { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
-  background: linear-gradient(90deg, #faf5ff, #fdf2f8); border: 1px solid #f0e6fb; border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.85rem; }
-.promo-info { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.86rem; color: #475569; }
+.promo { display: flex; flex-direction: column; gap: 0.55rem;
+  background: linear-gradient(135deg, #faf5ff, #fdf2f8); border: 1px solid #f0e6fb; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0.85rem; }
+.promo-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.promo-headline { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; font-size: 0.92rem; color: #334155; }
+.promo-headline strong { font-size: 0.98rem; }
 .promo-tag { background: #ede9fe; color: #6d28d9; font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; }
 .promo-disc { color: #be185d; font-weight: 700; }
-.promo-cats, .promo-win { color: #64748b; font-size: 0.8rem; }
+.promo-uplift { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.74rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 999px; }
+.promo-mechanic { margin: 0; font-size: 0.88rem; color: #4434d4; font-weight: 600; }
+.promo-note { margin: 0; font-size: 0.78rem; color: #8a7bd8; }
+.promo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.55rem 0.9rem; margin-top: 0.15rem; }
+.promo-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.pf-label { font-size: 0.76rem; font-weight: 700; color: #6d28d9; }
+.pf-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.pf-tag { background: #fff; border: 1px solid #e9d8fb; color: #5b3fb0; font-size: 0.76rem; padding: 0.12rem 0.5rem; border-radius: 6px; }
+.pf-tag.bundle { background: #fdf2f8; border-color: #fbcfe8; color: #be185d; }
+.pf-tag.channel { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.promo-foot { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem; color: #64748b; border-top: 1px dashed #f0e6fb; padding-top: 0.5rem; }
+.promo-tip { margin: 0; font-size: 0.82rem; color: #9a3412; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 0.45rem 0.6rem; }
 
 .inv-block { border-top: 1px dashed #e7edf4; padding-top: 0.75rem; }
 .inv-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }

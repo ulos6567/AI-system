@@ -15,6 +15,11 @@ const eventsRouter = Router({ mergeParams: true });
 const TriggerType = z.enum(['shelf_life', 'weather', 'demand_drop', 'schedule', 'manual']);
 const ActionType = z.enum(['percent_off', 'fixed_price', 'bundle']);
 
+// AI 처방 가격인하 액션이 실행될 때 prescription 서비스가 자동 생성하는 시스템 룰.
+// pricing_event의 FK 대상으로만 쓰이며, 실시간 가격 설정 화면 목록에는 노출하지 않는다.
+// (services/prescription.ts ensurePrescriptionRule 와 이름이 일치해야 함)
+const AUTO_PRESCRIPTION_RULE_NAME = 'AI 처방 (자동생성)';
+
 const RuleSchema = z.object({
   storeId: z.number().int().nullable().optional(),
   name: z.string().min(1).max(128),
@@ -37,6 +42,9 @@ rulesRouter.get('/rules', requireAuth, async (req, res) => {
     wheres.push('(store_id = ? OR store_id IS NULL)');
     args.push(storeIdParam);
   }
+  // 자동생성 시스템 룰은 화면 목록에서 제외 (사용자가 직접 만든 할인 운영만 노출)
+  wheres.push('name <> ?');
+  args.push(AUTO_PRESCRIPTION_RULE_NAME);
   const whereSql = wheres.length ? `WHERE ${wheres.join(' AND ')}` : '';
   const [rows] = await pool.query<any[]>(
     `SELECT id, store_id AS storeId, name,

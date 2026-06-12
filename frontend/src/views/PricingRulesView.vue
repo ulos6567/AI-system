@@ -206,7 +206,10 @@ function benefitLabel(r: { actionType: ActionType; actionConfig: Record<string, 
   }
   if (r.actionType === 'bundle') {
     const pct = Number(c.percent) || numFromName(/(\d+)\s*%/);
-    return `번들 ${pct}% 할인${duration}`;
+    // 번들은 'N+1 행사'로 표기한다. pct = 100/(N+1) 관계 → 33%→2+1, 50%→1+1, 25%→3+1
+    const total = pct > 0 ? Math.round(100 / pct) : 0;
+    if (total >= 2) return `${total - 1}+1 행사${duration}`;
+    return `번들 ${pct}% 할인${duration}`; // 비정형 비율은 기존 표기 유지
   }
   const pct = Number(c.percent) || numFromName(/(\d+)\s*%/);
   return `${pct}% 할인${duration}`;
@@ -249,7 +252,7 @@ const todayAvgMarkdownRate = computed(() => {
     <header class="page-header">
       <div>
         <h2>실시간 가격 설정</h2>
-        <p class="subtitle">{{ pricing.rules.length }}건의 가격 규칙 · 점포 #{{ storeId }}</p>
+        <p class="subtitle">{{ pricing.rules.length }}건의 할인 품목 · 점포 #{{ storeId }}</p>
       </div>
       <button
         class="primary add-rule"
@@ -263,7 +266,7 @@ const todayAvgMarkdownRate = computed(() => {
     <section class="summary-cards">
       <div class="metric-card">
         <div class="metric-text">
-          <span class="metric-label">진행 중인 할인 규칙</span>
+          <span class="metric-label">진행 중인 할인 품목</span>
           <strong class="metric-value">{{ activeCount }}건</strong>
         </div>
         <span class="metric-icon">

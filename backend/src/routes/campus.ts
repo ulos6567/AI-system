@@ -41,8 +41,13 @@ router.get('/calendar', requireAuth, requireStoreScope(), async (req, res) => {
 
 router.get('/recommendations', requireAuth, requireStoreScope(), async (req, res) => {
   const storeId = Number(req.params.storeId);
-  const plays = await buildRecommendations(storeId);
-  res.json({ storeId, plays });
+  // 지역 필터로 특정 대학을 보는 경우: universityIds=1,2,3 (최대 25개)
+  const raw = String(req.query.universityIds ?? '').trim();
+  const universityIds = raw
+    ? raw.split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0).slice(0, 25)
+    : [];
+  const plays = await buildRecommendations(storeId, universityIds.length ? { universityIds } : undefined);
+  res.json({ storeId, scope: universityIds.length ? 'filtered' : 'nearby', plays });
 });
 
 const PromoteSchema = z.object({
@@ -52,6 +57,11 @@ const PromoteSchema = z.object({
   discountPct: z.number().min(0).max(90),
   startDate: z.string().min(8).max(10),
   endDate: z.string().min(8).max(10),
+  // 상세 추진안(있으면 이벤트로그에 함께 적재) — 표시·기록용
+  mechanic: z.string().max(200).optional(),
+  bundles: z.array(z.string().min(1)).max(20).optional(),
+  channels: z.array(z.string().min(1)).max(20).optional(),
+  expectedUpliftPct: z.number().min(-100).max(500).optional(),
 });
 
 router.post('/promote', requireAuth, requireStoreScope(), requireAdmin, async (req, res) => {
@@ -68,7 +78,7 @@ router.post('/promote', requireAuth, requireStoreScope(), requireAdmin, async (r
     userId,
     severity: 'info',
     eventType: 'campus.promotion_launched',
-    message: `${p.label} (${p.discountPct}% / ${p.categories.join(',')})`,
+    message: `${p.label} (${p.discountPct}% / ${p.categories.join(',')})${p.mechanic ? ` — ${p.mechanic}` : ''}`,
     metadata: {
       academicEventId: p.academicEventId,
       label: p.label,
@@ -76,6 +86,10 @@ router.post('/promote', requireAuth, requireStoreScope(), requireAdmin, async (r
       discountPct: p.discountPct,
       startDate: p.startDate,
       endDate: p.endDate,
+      mechanic: p.mechanic ?? null,
+      bundles: p.bundles ?? null,
+      channels: p.channels ?? null,
+      expectedUpliftPct: p.expectedUpliftPct ?? null,
     },
   });
   res.status(201).json({ ok: true, eventLogId, promotion: p });
